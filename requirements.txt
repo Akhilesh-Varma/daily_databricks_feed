@@ -15,9 +15,10 @@ google-auth-oauthlib>=1.0.0
 google-cloud-storage>=2.10.0
 google-cloud-texttospeech>=2.14.0
 
-# Data processing (optional - for Spark/Delta)
-# pyspark>=3.4.0
-# delta-spark>=2.4.0
+# Data processing - PySpark Data Source API (requires PySpark 4.0+)
+pyspark>=4.0.0
+delta-spark>=3.0.0
+pyspark-data-sources>=0.1.0  # Reference implementations
 
 # Development dependencies
 pytest>=7.4.0
