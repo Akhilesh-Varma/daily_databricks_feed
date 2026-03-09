@@ -1,14 +1,26 @@
 # Databricks Asset Bundle configuration for Daily Databricks News Podcast
-# Compatible with Databricks Community Edition (with limitations)
+# Configured for Serverless Compute
+#
+# IMPORTANT: Serverless requires a paid Databricks workspace
+# - AWS: Premium or Enterprise tier
+# - Azure: Premium tier
+# - GCP: Premium tier
+#
+# For Community Edition (free), use the GitHub Actions workflow instead
 
 bundle:
   name: daily_databricks_feed
 
 variables:
-  # Data storage paths (local for Community Edition)
+  # Data storage paths
   data_path:
-    description: "Base path for Delta tables"
-    default: "./data"
+    description: "Base path for data storage"
+    default: "/Workspace/${workspace.current_user.userName}/daily_databricks_feed/data"
+
+  # Volume path for Unity Catalog (if available)
+  volume_path:
+    description: "Unity Catalog volume path for artifacts"
+    default: "/Volumes/main/default/podcast_data"
 
   # Podcast configuration
   podcast_title:
@@ -19,29 +31,76 @@ variables:
     description: "Podcast description"
     default: "Your daily 5-minute update on Databricks, data engineering, and lakehouse news"
 
+  # Notification email
+  notification_email:
+    description: "Email for job notifications"
+    default: ""
+
 include:
   - resources/*.yml
 
+# Artifact configuration for wheel distribution
+artifacts:
+  default:
+    type: whl
+    path: .
+    build: python setup.py bdist_wheel
+
+# Sync configuration
+sync:
+  include:
+    - "notebooks/**"
+    - "src/**"
+  exclude:
+    - "**/__pycache__"
+    - "**/.pytest_cache"
+    - "**/data"
+    - "**/*.pyc"
+
 targets:
-  # Local development target (for testing)
-  local:
+  # Development target with serverless
+  dev:
     mode: development
     default: true
+    workspace:
+      host: ${DATABRICKS_HOST}
     variables:
-      data_path: "./data"
+      data_path: "/Workspace/${workspace.current_user.userName}/daily_databricks_feed/dev/data"
+      notification_email: ""
+    run_as:
+      # Uses current user's identity
+      user_name: ${workspace.current_user.userName}
 
-  # Development target (Databricks workspace)
-  dev:
+  # Staging target
+  staging:
     mode: development
     workspace:
       host: ${DATABRICKS_HOST}
     variables:
-      data_path: "/tmp/daily_databricks_feed/data"
+      data_path: "/Workspace/Shared/daily_databricks_feed/staging/data"
+    run_as:
+      user_name: ${workspace.current_user.userName}
 
-  # Production target (if upgrading from Community Edition)
+  # Production target with serverless
   prod:
     mode: production
     workspace:
       host: ${DATABRICKS_HOST}
+      root_path: /Workspace/Shared/daily_databricks_feed/prod
     variables:
       data_path: "/Volumes/main/default/podcast_data"
+      notification_email: ${NOTIFICATION_EMAIL}
+    run_as:
+      # Use service principal in production
+      service_principal_name: ${SERVICE_PRINCIPAL_NAME}
+    permissions:
+      - level: CAN_VIEW
+        group_name: users
+      - level: CAN_MANAGE
+        group_name: admins
+
+  # Local development (for testing without Databricks)
+  local:
+    mode: development
+    variables:
+      data_path: "./data"
