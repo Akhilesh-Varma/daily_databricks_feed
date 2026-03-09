@@ -1,0 +1,47 @@
+# Databricks Asset Bundle configuration for Daily Databricks News Podcast
+# Compatible with Databricks Community Edition (with limitations)
+
+bundle:
+  name: daily_databricks_feed
+
+variables:
+  # Data storage paths (local for Community Edition)
+  data_path:
+    description: "Base path for Delta tables"
+    default: "./data"
+
+  # Podcast configuration
+  podcast_title:
+    description: "Name of the podcast"
+    default: "Daily Databricks Digest"
+
+  podcast_description:
+    description: "Podcast description"
+    default: "Your daily 5-minute update on Databricks, data engineering, and lakehouse news"
+
+include:
+  - resources/*.yml
+
+targets:
+  # Local development target (for testing)
+  local:
+    mode: development
+    default: true
+    variables:
+      data_path: "./data"
+
+  # Development target (Databricks workspace)
+  dev:
+    mode: development
+    workspace:
+      host: ${DATABRICKS_HOST}
+    variables:
+      data_path: "/tmp/daily_databricks_feed/data"
+
+  # Production target (if upgrading from Community Edition)
+  prod:
+    mode: production
+    workspace:
+      host: ${DATABRICKS_HOST}
+    variables:
+      data_path: "/Volumes/main/default/podcast_data"
