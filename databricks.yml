@@ -1,57 +1,71 @@
 # Databricks Asset Bundle configuration for Daily Databricks News Podcast
-# Configured for Serverless Compute
-#
-# IMPORTANT: Serverless requires a paid Databricks workspace
-# - AWS: Premium or Enterprise tier
-# - Azure: Premium tier
-# - GCP: Premium tier
-#
-# For Community Edition (free), use the GitHub Actions workflow instead
+# Secrets are passed as bundle variables via --var flags in deploy.yml
+# and injected into the serverless environment spec.
 
 bundle:
   name: daily_databricks_feed
 
 variables:
-  # Data storage paths
+  # ── Data paths ──────────────────────────────────────────────────────────────
   data_path:
     description: "Base path for data storage"
     default: "/Workspace/${workspace.current_user.userName}/daily_databricks_feed/data"
 
-  # Volume path for Unity Catalog (if available)
   volume_path:
     description: "Unity Catalog volume path for artifacts"
     default: "/Volumes/main/default/podcast_data"
 
-  # Podcast configuration
+  # ── Podcast metadata ─────────────────────────────────────────────────────────
   podcast_title:
     description: "Name of the podcast"
     default: "Daily Databricks Digest"
 
-  podcast_description:
-    description: "Podcast description"
-    default: "Your daily 5-minute update on Databricks, data engineering, and lakehouse news"
-
-  # Notification email (set NOTIFICATION_EMAIL in GitHub secrets to enable)
   notification_email:
     description: "Email for job notifications"
     default: "noreply@example.com"
 
-  # Databricks Secret Scope name (populated by GitHub Actions deploy workflow)
-  secret_scope:
-    description: "Databricks secret scope holding all API keys"
-    default: "daily-podcast"
+  # ── API secrets (passed via --var in deploy.yml) ─────────────────────────────
+  reddit_client_id:
+    description: "Reddit OAuth client ID"
+    default: ""
+
+  reddit_client_secret:
+    description: "Reddit OAuth client secret"
+    default: ""
+
+  youtube_api_key:
+    description: "YouTube Data API key"
+    default: ""
+
+  gcp_service_account_json:
+    description: "GCP service account JSON (single line)"
+    default: ""
+
+  gcs_bucket_name:
+    description: "GCS bucket for audio and RSS feed"
+    default: ""
+
+  audio_base_url:
+    description: "Public base URL for audio files"
+    default: ""
+
+  claude_api_key:
+    description: "Anthropic Claude API key"
+    default: ""
+
+  google_api_key:
+    description: "Google Gemini API key (optional fallback)"
+    default: ""
 
 include:
   - resources/*.yml
 
-# Artifact configuration for wheel distribution
 artifacts:
   default:
     type: whl
     path: .
     build: python setup.py bdist_wheel
 
-# Sync configuration
 sync:
   include:
     - "notebooks/**"
@@ -63,7 +77,6 @@ sync:
     - "**/*.pyc"
 
 targets:
-  # Development target with serverless
   dev:
     mode: development
     default: true
@@ -73,10 +86,8 @@ targets:
       data_path: "/Workspace/${workspace.current_user.userName}/daily_databricks_feed/dev/data"
       notification_email: ""
     run_as:
-      # Uses current user's identity
       user_name: ${workspace.current_user.userName}
 
-  # Staging target
   staging:
     mode: development
     workspace:
@@ -86,7 +97,6 @@ targets:
     run_as:
       user_name: ${workspace.current_user.userName}
 
-  # Production target with serverless
   prod:
     mode: production
     workspace:
@@ -96,7 +106,6 @@ targets:
       data_path: "/Volumes/main/default/podcast_data"
       notification_email: ${NOTIFICATION_EMAIL}
     run_as:
-      # Use service principal in production
       service_principal_name: ${SERVICE_PRINCIPAL_NAME}
     permissions:
       - level: CAN_VIEW
@@ -104,7 +113,6 @@ targets:
       - level: CAN_MANAGE
         group_name: admins
 
-  # Local development (for testing without Databricks)
   local:
     mode: development
     variables:

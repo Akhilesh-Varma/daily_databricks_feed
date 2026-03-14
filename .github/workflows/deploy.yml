@@ -1,17 +1,15 @@
 name: Deploy & Run Daily Databricks Podcast
 
 on:
-  # Run daily at 6 AM UTC
   schedule:
     - cron: "0 6 * * *"
 
-  # Manual trigger with options
   workflow_dispatch:
     inputs:
       target:
         description: "Deployment target"
         required: false
-        default: "prod"
+        default: "dev"
         type: choice
         options: [dev, staging, prod]
       dry_run:
@@ -38,30 +36,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ── Install the modern Databricks CLI (Go-based) ──────────────────────
       - name: Install Databricks CLI
         uses: databricks/setup-cli@main
 
-      - name: Verify Databricks CLI
-        run: databricks --version
-
-      # ── Normalise DATABRICKS_HOST (Databricks CLI requires https:// prefix) ─
-      - name: Normalise Databricks host
+      # ── Verify auth before doing anything ─────────────────────────────────
+      - name: Verify Databricks auth
         run: |
-          HOST="${DATABRICKS_HOST}"
-          # Strip trailing slash
-          HOST="${HOST%/}"
-          # Ensure https:// prefix
-          if [[ "$HOST" != https://* ]]; then
-            HOST="https://$HOST"
-          fi
-          echo "DATABRICKS_HOST=$HOST" >> $GITHUB_ENV
-          echo "Host set to: $HOST"
+          databricks current-user me
+          echo "Auth OK — connected to $DATABRICKS_HOST"
 
-      # ── Push all API secrets into Databricks Secret Scope ─────────────────
-      # This runs once per deploy so Databricks notebooks can read them via
-      # {{secrets/daily-podcast/<key>}} without ever seeing the raw values.
-      - name: Sync secrets to Databricks Secret Scope
+      # ── Deploy bundle, injecting all secrets as --var flags ────────────────
+      # Secrets never touch disk — they go straight from GitHub Secrets
+      # into Databricks as bundle variable values, then into notebook
+      # base_parameters at job run time.
+      - name: Deploy bundle to Databricks
         env:
           REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
           REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
@@ -72,25 +60,15 @@ jobs:
           CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
-          # Create scope if it doesn't exist (safe to re-run)
-          databricks secrets create-scope daily-podcast 2>/dev/null || echo "Scope already exists"
-
-          # Sync each secret (only if the GitHub secret is set)
-          [ -n "$REDDIT_CLIENT_ID" ]       && databricks secrets put-secret daily-podcast REDDIT_CLIENT_ID       --string-value "$REDDIT_CLIENT_ID"
-          [ -n "$REDDIT_CLIENT_SECRET" ]   && databricks secrets put-secret daily-podcast REDDIT_CLIENT_SECRET   --string-value "$REDDIT_CLIENT_SECRET"
-          [ -n "$YOUTUBE_API_KEY" ]        && databricks secrets put-secret daily-podcast YOUTUBE_API_KEY        --string-value "$YOUTUBE_API_KEY"
-          [ -n "$GCP_SERVICE_ACCOUNT_JSON" ] && databricks secrets put-secret daily-podcast GCP_SERVICE_ACCOUNT_JSON --string-value "$GCP_SERVICE_ACCOUNT_JSON"
-          [ -n "$GCS_BUCKET_NAME" ]        && databricks secrets put-secret daily-podcast GCS_BUCKET_NAME        --string-value "$GCS_BUCKET_NAME"
-          [ -n "$AUDIO_BASE_URL" ]         && databricks secrets put-secret daily-podcast AUDIO_BASE_URL         --string-value "$AUDIO_BASE_URL"
-          [ -n "$CLAUDE_API_KEY" ]         && databricks secrets put-secret daily-podcast CLAUDE_API_KEY         --string-value "$CLAUDE_API_KEY"
-          [ -n "$GOOGLE_API_KEY" ]         && databricks secrets put-secret daily-podcast GOOGLE_API_KEY         --string-value "$GOOGLE_API_KEY"
-
-          echo "Secrets synced to Databricks scope: daily-podcast"
-
-      # ── Deploy the bundle (uploads notebooks + wheel to workspace) ─────────
-      - name: Deploy bundle to Databricks
-        run: |
-          databricks bundle deploy --target $TARGET
+          databricks bundle deploy --target $TARGET \
+            --var "reddit_client_id=$REDDIT_CLIENT_ID" \
+            --var "reddit_client_secret=$REDDIT_CLIENT_SECRET" \
+            --var "youtube_api_key=$YOUTUBE_API_KEY" \
+            --var "gcp_service_account_json=$GCP_SERVICE_ACCOUNT_JSON" \
+            --var "gcs_bucket_name=$GCS_BUCKET_NAME" \
+            --var "audio_base_url=$AUDIO_BASE_URL" \
+            --var "claude_api_key=$CLAUDE_API_KEY" \
+            --var "google_api_key=${GOOGLE_API_KEY:-}"
           echo "Bundle deployed to target: $TARGET"
 
       # ── Trigger the Databricks job and wait for completion ─────────────────
@@ -102,7 +80,7 @@ jobs:
             --params max_stories=10
         timeout-minutes: 60
 
-      # ── Job summary ────────────────────────────────────────────────────────
+      # ── Summary ────────────────────────────────────────────────────────────
       - name: Write job summary
         if: always()
         run: |
@@ -115,14 +93,12 @@ jobs:
           echo "| Workspace | $DATABRICKS_HOST |" >> $GITHUB_STEP_SUMMARY
           echo "| Dry run | ${{ github.event.inputs.dry_run || 'false' }} |" >> $GITHUB_STEP_SUMMARY
 
-  # ── Notify on failure ──────────────────────────────────────────────────────
   notify-on-failure:
     runs-on: ubuntu-latest
     needs: deploy-and-run
     if: failure()
-
     steps:
       - name: Notify failure
         run: |
           echo "Podcast pipeline failed on target: ${{ github.event.inputs.target || 'prod' }}"
-          echo "Check the Databricks job run for details: ${{ secrets.DATABRICKS_HOST }}"
+          echo "Workspace: ${{ secrets.DATABRICKS_HOST }}"

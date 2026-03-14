@@ -1,6 +1,6 @@
 # Workflow definition for Daily Databricks News Podcast
-# Secrets are injected from Databricks Secret Scope "daily-podcast"
-# (populated by GitHub Actions deploy.yml before bundle deploy)
+# Secrets are injected via bundle variables (set by --var flags in deploy.yml)
+# and exposed as environment variables through the serverless environment spec.
 
 resources:
   jobs:
@@ -8,20 +8,18 @@ resources:
       name: "Daily Databricks Podcast Generator"
       description: "Generates daily podcast from Databricks news sources using serverless compute"
 
-      # Schedule - runs daily at 6 AM UTC
       schedule:
         quartz_cron_expression: "0 0 6 * * ?"
         timezone_id: "UTC"
         pause_status: "UNPAUSED"
 
-      # Job-level parameters
       parameters:
         - name: "days_back"
           default: "1"
         - name: "max_stories"
           default: "10"
 
-      # Serverless environment — dependencies installed at runtime
+      # Serverless environment — all secrets injected here as env vars
       environments:
         - environment_key: "default"
           spec:
@@ -36,7 +34,6 @@ resources:
               - google-cloud-texttospeech>=2.14.0
 
       tasks:
-        # ── Task 1: Fetch news from all sources ────────────────────────────
         - task_key: bronze_ingestion
           description: "Fetch news from HN, Reddit, YouTube, RSS feeds"
           notebook_task:
@@ -44,9 +41,11 @@ resources:
             source: WORKSPACE
             base_parameters:
               DAYS_BACK: "{{job.parameters.days_back}}"
+              REDDIT_CLIENT_ID: "${var.reddit_client_id}"
+              REDDIT_CLIENT_SECRET: "${var.reddit_client_secret}"
+              YOUTUBE_API_KEY: "${var.youtube_api_key}"
           environment_key: "default"
 
-        # ── Task 2: Clean and deduplicate ─────────────────────────────────
         - task_key: silver_transformation
           description: "Clean, deduplicate, and extract keywords"
           depends_on:
@@ -56,7 +55,6 @@ resources:
             source: WORKSPACE
           environment_key: "default"
 
-        # ── Task 3: Select top stories ────────────────────────────────────
         - task_key: gold_aggregation
           description: "Select top stories for the day"
           depends_on:
@@ -68,17 +66,18 @@ resources:
               MAX_STORIES: "{{job.parameters.max_stories}}"
           environment_key: "default"
 
-        # ── Task 4: Generate podcast script with LLM ──────────────────────
         - task_key: script_generation
-          description: "Generate podcast script using Groq / Anthropic / Gemini"
+          description: "Generate podcast script using Claude"
           depends_on:
             - task_key: gold_aggregation
           notebook_task:
             notebook_path: ../notebooks/04_script_generation.py
             source: WORKSPACE
+            base_parameters:
+              CLAUDE_API_KEY: "${var.claude_api_key}"
+              GOOGLE_API_KEY: "${var.google_api_key}"
           environment_key: "default"
 
-        # ── Task 5: Convert script to audio via GCP TTS ───────────────────
         - task_key: audio_generation
           description: "Convert script to MP3 using Google Cloud TTS"
           depends_on:
@@ -86,9 +85,10 @@ resources:
           notebook_task:
             notebook_path: ../notebooks/05_audio_generation.py
             source: WORKSPACE
+            base_parameters:
+              GCP_SERVICE_ACCOUNT_JSON: "${var.gcp_service_account_json}"
           environment_key: "default"
 
-        # ── Task 6: Upload audio + publish RSS feed ────────────────────────
         - task_key: publish_podcast
           description: "Upload audio to GCS and update RSS feed"
           depends_on:
@@ -96,11 +96,14 @@ resources:
           notebook_task:
             notebook_path: ../notebooks/06_publish_podcast.py
             source: WORKSPACE
+            base_parameters:
+              GCP_SERVICE_ACCOUNT_JSON: "${var.gcp_service_account_json}"
+              GCS_BUCKET_NAME: "${var.gcs_bucket_name}"
+              AUDIO_BASE_URL: "${var.audio_base_url}"
           environment_key: "default"
 
       max_concurrent_runs: 1
 
-      # Email notifications (set NOTIFICATION_EMAIL GitHub secret to enable)
       email_notifications:
         on_failure:
           - ${var.notification_email}

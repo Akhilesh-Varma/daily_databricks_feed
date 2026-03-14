@@ -141,7 +141,13 @@ class SecretsManager:
         self._load_databricks_secrets()
 
     def _load_databricks_secrets(self) -> None:
-        """Load secrets from Databricks Secret Scope when running inside Databricks."""
+        """
+        Load secrets when running inside Databricks.
+
+        Tries two sources in order:
+        1. Databricks Widget parameters (set via job base_parameters — primary method)
+        2. Databricks Secret Scope 'daily-podcast' (fallback for Premium workspaces)
+        """
         try:
             import IPython
 
@@ -149,24 +155,37 @@ class SecretsManager:
             if dbutils is None:
                 return
 
-            scope = "daily-podcast"
-            # Map env var name → secret key in the scope
             secret_keys = [c.env_var for c in SECRETS.values()]
             loaded = 0
+
+            # ── Source 1: Widget params (from job base_parameters) ──────────
             for key in secret_keys:
                 if os.environ.get(key):
-                    continue  # already set, skip
+                    continue
                 try:
-                    value = dbutils.secrets.get(scope=scope, key=key)
+                    value = dbutils.widgets.getArgument(key, "")
                     if value:
                         os.environ[key] = value
                         self._cache[key] = value
                         loaded += 1
                 except Exception:
-                    pass  # secret not found in scope, skip silently
+                    pass
+
+            # ── Source 2: Databricks Secret Scope (Premium workspaces) ──────
+            for key in secret_keys:
+                if os.environ.get(key):
+                    continue
+                try:
+                    value = dbutils.secrets.get(scope="daily-podcast", key=key)
+                    if value:
+                        os.environ[key] = value
+                        self._cache[key] = value
+                        loaded += 1
+                except Exception:
+                    pass
 
             if loaded:
-                logger.info(f"Loaded {loaded} secrets from Databricks scope '{scope}'")
+                logger.info(f"Loaded {loaded} secrets from Databricks (widgets + secret scope)")
 
         except Exception:
             pass  # not running in Databricks, skip silently
