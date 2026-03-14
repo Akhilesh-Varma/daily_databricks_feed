@@ -1,31 +1,10 @@
-# Core dependencies
+# Runtime dependencies (installed by Databricks serverless via resources/jobs.yml)
+# This file is used by GitHub Actions CI only — keep it lean.
 requests>=2.31.0
-python-dotenv>=1.0.0
-
-# Data sources
-praw>=7.7.0  # Reddit API
-feedparser>=6.0.0  # RSS feeds
-
-# Audio processing
-pydub>=0.25.0  # Audio stitching
-
-# Google Cloud (optional - for TTS and GCS)
+praw>=7.7.0
+feedparser>=6.0.0
+pydub>=0.25.0
 google-auth>=2.22.0
 google-auth-oauthlib>=1.0.0
 google-cloud-storage>=2.10.0
 google-cloud-texttospeech>=2.14.0
-
-# Data processing - PySpark Data Source API (requires PySpark 4.0+)
-pyspark>=4.0.0
-delta-spark>=3.0.0
-pyspark-data-sources>=0.1.0  # Reference implementations
-
-# Development dependencies
-pytest>=7.4.0
-pytest-cov>=4.1.0
-black>=23.7.0
-flake8>=6.1.0
-mypy>=1.5.0
-
-# Type stubs
-types-requests>=2.31.0

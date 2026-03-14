@@ -3,8 +3,8 @@
 # MAGIC # Script Generation - Generate Podcast Script using LLM
 # MAGIC
 # MAGIC This notebook generates the podcast script:
-# MAGIC - Uses free LLM APIs (Groq, Anthropic, Gemini)
-# MAGIC - Falls back to template-based generation
+# MAGIC - Uses Claude (Anthropic) as primary LLM — key read from CLAUDE_API_KEY env var
+# MAGIC - Falls back to Gemini, then template-based generation
 # MAGIC - Creates intro, stories, and outro segments
 
 # COMMAND ----------
@@ -88,10 +88,9 @@ for i, story in enumerate(stories[:7], 1):
 
 from daily_databricks_feed.aggregation.script_generator import ScriptGenerator
 
-# Initialize with available API keys
+# Initialize — Claude key is read from CLAUDE_API_KEY env var (injected by Databricks job)
 generator = ScriptGenerator(
-    groq_api_key=secrets.get("groq_api_key"),
-    anthropic_api_key=secrets.get("anthropic_api_key"),
+    anthropic_api_key=secrets.get("claude_api_key"),
     google_api_key=secrets.get("google_api_key"),
 )
 

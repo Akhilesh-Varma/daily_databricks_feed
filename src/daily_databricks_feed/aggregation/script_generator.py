@@ -68,7 +68,7 @@ class GroqProvider(LLMProvider):
         }
 
         data = {
-            "model": "llama-3.1-70b-versatile",
+            "model": "llama-3.3-70b-versatile",
             "messages": [
                 {
                     "role": "system",
@@ -95,7 +95,11 @@ class AnthropicProvider(LLMProvider):
     BASE_URL = "https://api.anthropic.com/v1/messages"
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+        self.api_key = (
+            api_key
+            or os.environ.get("CLAUDE_API_KEY")
+            or os.environ.get("ANTHROPIC_API_KEY")
+        )
 
     def is_available(self) -> bool:
         return self.api_key is not None
@@ -111,7 +115,7 @@ class AnthropicProvider(LLMProvider):
         }
 
         data = {
-            "model": "claude-3-haiku-20240307",
+            "model": "claude-sonnet-4-6",
             "max_tokens": max_tokens,
             "system": "You are a professional podcast script writer. Write engaging, conversational scripts for a daily tech news podcast about Databricks and data engineering.",
             "messages": [{"role": "user", "content": prompt}],
@@ -221,8 +225,8 @@ class ScriptGenerator:
             google_api_key: Google Gemini API key
         """
         self.providers = [
-            GroqProvider(groq_api_key),
             AnthropicProvider(anthropic_api_key),
+            GroqProvider(groq_api_key),
             GeminiProvider(google_api_key),
             FallbackProvider(),
         ]

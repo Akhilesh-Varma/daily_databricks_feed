@@ -31,10 +31,15 @@ variables:
     description: "Podcast description"
     default: "Your daily 5-minute update on Databricks, data engineering, and lakehouse news"
 
-  # Notification email
+  # Notification email (set NOTIFICATION_EMAIL in GitHub secrets to enable)
   notification_email:
     description: "Email for job notifications"
-    default: ""
+    default: "noreply@example.com"
+
+  # Databricks Secret Scope name (populated by GitHub Actions deploy workflow)
+  secret_scope:
+    description: "Databricks secret scope holding all API keys"
+    default: "daily-podcast"
 
 include:
   - resources/*.yml

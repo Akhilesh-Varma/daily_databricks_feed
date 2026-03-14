@@ -57,17 +57,11 @@ SECRETS = {
         required=False,
         description="Public URL base for audio files",
     ),
-    "anthropic_api_key": SecretConfig(
-        name="anthropic_api_key",
-        env_var="ANTHROPIC_API_KEY",
+    "claude_api_key": SecretConfig(
+        name="claude_api_key",
+        env_var="CLAUDE_API_KEY",
         required=False,
-        description="Anthropic API key for Claude",
-    ),
-    "groq_api_key": SecretConfig(
-        name="groq_api_key",
-        env_var="GROQ_API_KEY",
-        required=False,
-        description="Groq API key for fast LLM inference",
+        description="Anthropic Claude API key for script generation",
     ),
     "google_api_key": SecretConfig(
         name="google_api_key",

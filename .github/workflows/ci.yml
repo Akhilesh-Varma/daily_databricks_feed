@@ -63,18 +63,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
       - name: Install Databricks CLI
-        run: |
-          pip install databricks-cli
+        uses: databricks/setup-cli@main
 
-      - name: Validate bundle (syntax check)
+      - name: Validate bundle YAML (no auth required)
         run: |
-          # Basic YAML validation
-          python -c "import yaml; yaml.safe_load(open('databricks.yml'))"
-          python -c "import yaml; yaml.safe_load(open('resources/jobs.yml'))"
-          echo "Bundle YAML files are valid"
+          python -c "import yaml; yaml.safe_load(open('databricks.yml')); print('databricks.yml OK')"
+          python -c "import yaml; yaml.safe_load(open('resources/jobs.yml')); print('resources/jobs.yml OK')"

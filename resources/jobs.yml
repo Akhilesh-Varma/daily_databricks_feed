@@ -1,8 +1,6 @@
 # Workflow definition for Daily Databricks News Podcast
-# Configured for Databricks Serverless Compute
-#
-# IMPORTANT: Serverless requires a paid Databricks workspace (not Community Edition)
-# Supported on: AWS, Azure, GCP Databricks workspaces with serverless enabled
+# Secrets are injected from Databricks Secret Scope "daily-podcast"
+# (populated by GitHub Actions deploy.yml before bundle deploy)
 
 resources:
   jobs:
@@ -16,15 +14,14 @@ resources:
         timezone_id: "UTC"
         pause_status: "UNPAUSED"
 
-      # Use serverless compute for all tasks
-      # This eliminates cluster startup time and reduces costs
+      # Job-level parameters
       parameters:
         - name: "days_back"
           default: "1"
         - name: "max_stories"
           default: "10"
 
-      # Environment configuration for serverless
+      # Serverless environment — dependencies installed at runtime
       environments:
         - environment_key: "default"
           spec:
@@ -39,6 +36,7 @@ resources:
               - google-cloud-texttospeech>=2.14.0
 
       tasks:
+        # ── Task 1: Fetch news from all sources ────────────────────────────
         - task_key: bronze_ingestion
           description: "Fetch news from HN, Reddit, YouTube, RSS feeds"
           notebook_task:
@@ -46,9 +44,14 @@ resources:
             source: WORKSPACE
             base_parameters:
               DAYS_BACK: "{{job.parameters.days_back}}"
-          # Serverless compute - no cluster specification needed
           environment_key: "default"
+          # Secrets injected as environment variables (readable via os.environ)
+          environment_variables:
+            REDDIT_CLIENT_ID: "{{secrets/daily-podcast/REDDIT_CLIENT_ID}}"
+            REDDIT_CLIENT_SECRET: "{{secrets/daily-podcast/REDDIT_CLIENT_SECRET}}"
+            YOUTUBE_API_KEY: "{{secrets/daily-podcast/YOUTUBE_API_KEY}}"
 
+        # ── Task 2: Clean and deduplicate ─────────────────────────────────
         - task_key: silver_transformation
           description: "Clean, deduplicate, and extract keywords"
           depends_on:
@@ -58,8 +61,9 @@ resources:
             source: WORKSPACE
           environment_key: "default"
 
+        # ── Task 3: Select top stories ────────────────────────────────────
         - task_key: gold_aggregation
-          description: "Select top 10 stories for the day"
+          description: "Select top stories for the day"
           depends_on:
             - task_key: silver_transformation
           notebook_task:
@@ -69,85 +73,55 @@ resources:
               MAX_STORIES: "{{job.parameters.max_stories}}"
           environment_key: "default"
 
+        # ── Task 4: Generate podcast script with LLM ──────────────────────
         - task_key: script_generation
-          description: "Generate podcast script using LLM"
+          description: "Generate podcast script using Groq / Anthropic / Gemini"
           depends_on:
             - task_key: gold_aggregation
           notebook_task:
             notebook_path: ../notebooks/04_script_generation.py
             source: WORKSPACE
           environment_key: "default"
+          environment_variables:
+            CLAUDE_API_KEY: "{{secrets/daily-podcast/CLAUDE_API_KEY}}"
+            GOOGLE_API_KEY: "{{secrets/daily-podcast/GOOGLE_API_KEY}}"
 
+        # ── Task 5: Convert script to audio via GCP TTS ───────────────────
         - task_key: audio_generation
-          description: "Convert script to audio using TTS"
+          description: "Convert script to MP3 using Google Cloud TTS"
           depends_on:
             - task_key: script_generation
           notebook_task:
             notebook_path: ../notebooks/05_audio_generation.py
             source: WORKSPACE
           environment_key: "default"
+          environment_variables:
+            GCP_SERVICE_ACCOUNT_JSON: "{{secrets/daily-podcast/GCP_SERVICE_ACCOUNT_JSON}}"
 
+        # ── Task 6: Upload audio + publish RSS feed ────────────────────────
         - task_key: publish_podcast
-          description: "Upload audio and update RSS feed"
+          description: "Upload audio to GCS and update RSS feed"
           depends_on:
             - task_key: audio_generation
           notebook_task:
             notebook_path: ../notebooks/06_publish_podcast.py
             source: WORKSPACE
           environment_key: "default"
+          environment_variables:
+            GCP_SERVICE_ACCOUNT_JSON: "{{secrets/daily-podcast/GCP_SERVICE_ACCOUNT_JSON}}"
+            GCS_BUCKET_NAME: "{{secrets/daily-podcast/GCS_BUCKET_NAME}}"
+            AUDIO_BASE_URL: "{{secrets/daily-podcast/AUDIO_BASE_URL}}"
 
-      # Job-level settings
       max_concurrent_runs: 1
 
-      # Email notifications
+      # Email notifications (set NOTIFICATION_EMAIL GitHub secret to enable)
       email_notifications:
         on_failure:
-          - ${NOTIFICATION_EMAIL}
+          - ${var.notification_email}
         on_success:
-          - ${NOTIFICATION_EMAIL}
+          - ${var.notification_email}
 
-      # Webhook notifications (optional)
-      # webhook_notifications:
-      #   on_failure:
-      #     - id: "webhook_id"
-
-      # Tags for organization
       tags:
         project: "daily-databricks-podcast"
         environment: "${bundle.target}"
-        compute: "serverless"
-
-    # Alternative: Job with Python tasks (for non-notebook workflows)
-    daily_databricks_podcast_python:
-      name: "Daily Databricks Podcast Generator (Python Tasks)"
-      description: "Alternative job using Python script tasks with serverless"
-
-      schedule:
-        quartz_cron_expression: "0 0 6 * * ?"
-        timezone_id: "UTC"
-        pause_status: "PAUSED"  # Disabled by default, enable if preferred
-
-      tasks:
-        - task_key: run_pipeline
-          description: "Run full podcast pipeline"
-          python_wheel_task:
-            package_name: "daily_databricks_feed"
-            entry_point: "run_pipeline"
-            parameters:
-              - "--days-back"
-              - "1"
-              - "--max-stories"
-              - "10"
-          environment_key: "default"
-          libraries:
-            - whl: ../dist/daily_databricks_feed-*.whl
-
-      environments:
-        - environment_key: "default"
-          spec:
-            client: "1"
-
-      max_concurrent_runs: 1
-      tags:
-        project: "daily-databricks-podcast"
         compute: "serverless"
