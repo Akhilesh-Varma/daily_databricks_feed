@@ -45,6 +45,19 @@ jobs:
       - name: Verify Databricks CLI
         run: databricks --version
 
+      # ── Normalise DATABRICKS_HOST (Databricks CLI requires https:// prefix) ─
+      - name: Normalise Databricks host
+        run: |
+          HOST="${DATABRICKS_HOST}"
+          # Strip trailing slash
+          HOST="${HOST%/}"
+          # Ensure https:// prefix
+          if [[ "$HOST" != https://* ]]; then
+            HOST="https://$HOST"
+          fi
+          echo "DATABRICKS_HOST=$HOST" >> $GITHUB_ENV
+          echo "Host set to: $HOST"
+
       # ── Push all API secrets into Databricks Secret Scope ─────────────────
       # This runs once per deploy so Databricks notebooks can read them via
       # {{secrets/daily-podcast/<key>}} without ever seeing the raw values.

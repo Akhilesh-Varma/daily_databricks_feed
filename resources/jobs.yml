@@ -45,11 +45,6 @@ resources:
             base_parameters:
               DAYS_BACK: "{{job.parameters.days_back}}"
           environment_key: "default"
-          # Secrets injected as environment variables (readable via os.environ)
-          environment_variables:
-            REDDIT_CLIENT_ID: "{{secrets/daily-podcast/REDDIT_CLIENT_ID}}"
-            REDDIT_CLIENT_SECRET: "{{secrets/daily-podcast/REDDIT_CLIENT_SECRET}}"
-            YOUTUBE_API_KEY: "{{secrets/daily-podcast/YOUTUBE_API_KEY}}"
 
         # ── Task 2: Clean and deduplicate ─────────────────────────────────
         - task_key: silver_transformation
@@ -82,9 +77,6 @@ resources:
             notebook_path: ../notebooks/04_script_generation.py
             source: WORKSPACE
           environment_key: "default"
-          environment_variables:
-            CLAUDE_API_KEY: "{{secrets/daily-podcast/CLAUDE_API_KEY}}"
-            GOOGLE_API_KEY: "{{secrets/daily-podcast/GOOGLE_API_KEY}}"
 
         # ── Task 5: Convert script to audio via GCP TTS ───────────────────
         - task_key: audio_generation
@@ -95,8 +87,6 @@ resources:
             notebook_path: ../notebooks/05_audio_generation.py
             source: WORKSPACE
           environment_key: "default"
-          environment_variables:
-            GCP_SERVICE_ACCOUNT_JSON: "{{secrets/daily-podcast/GCP_SERVICE_ACCOUNT_JSON}}"
 
         # ── Task 6: Upload audio + publish RSS feed ────────────────────────
         - task_key: publish_podcast
@@ -107,10 +97,6 @@ resources:
             notebook_path: ../notebooks/06_publish_podcast.py
             source: WORKSPACE
           environment_key: "default"
-          environment_variables:
-            GCP_SERVICE_ACCOUNT_JSON: "{{secrets/daily-podcast/GCP_SERVICE_ACCOUNT_JSON}}"
-            GCS_BUCKET_NAME: "{{secrets/daily-podcast/GCS_BUCKET_NAME}}"
-            AUDIO_BASE_URL: "{{secrets/daily-podcast/AUDIO_BASE_URL}}"
 
       max_concurrent_runs: 1
 

@@ -136,6 +136,41 @@ class SecretsManager:
         if secrets_file and os.path.exists(secrets_file):
             self._load_secrets_file(secrets_file)
 
+        # When running inside Databricks, load all secrets from the secret scope
+        # into os.environ so the rest of the codebase can use os.environ.get() normally
+        self._load_databricks_secrets()
+
+    def _load_databricks_secrets(self) -> None:
+        """Load secrets from Databricks Secret Scope when running inside Databricks."""
+        try:
+            import IPython
+
+            dbutils = IPython.get_ipython().user_ns.get("dbutils")
+            if dbutils is None:
+                return
+
+            scope = "daily-podcast"
+            # Map env var name → secret key in the scope
+            secret_keys = [c.env_var for c in SECRETS.values()]
+            loaded = 0
+            for key in secret_keys:
+                if os.environ.get(key):
+                    continue  # already set, skip
+                try:
+                    value = dbutils.secrets.get(scope=scope, key=key)
+                    if value:
+                        os.environ[key] = value
+                        self._cache[key] = value
+                        loaded += 1
+                except Exception:
+                    pass  # secret not found in scope, skip silently
+
+            if loaded:
+                logger.info(f"Loaded {loaded} secrets from Databricks scope '{scope}'")
+
+        except Exception:
+            pass  # not running in Databricks, skip silently
+
     def _load_env_file(self, filepath: str) -> None:
         """Load secrets from .env file."""
         try:
