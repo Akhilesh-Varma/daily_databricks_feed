@@ -39,6 +39,13 @@ jobs:
       - name: Install Databricks CLI
         uses: databricks/setup-cli@main
 
+      # ── Debug: show host length and hex to catch invisible chars ──────────
+      - name: Debug host format
+        run: |
+          echo "Host length: ${#DATABRICKS_HOST}"
+          echo "$DATABRICKS_HOST" | cat -A
+          printf '%s' "$DATABRICKS_HOST" | od -c | head -3
+
       # ── Verify auth before doing anything ─────────────────────────────────
       - name: Verify Databricks auth
         run: |
