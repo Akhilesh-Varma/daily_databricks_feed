@@ -47,9 +47,7 @@ class SilverNewsItem:
             "content": self.content,
             "content_cleaned": self.content_cleaned,
             "author": self.author,
-            "published_at": (
-                self.published_at.isoformat() if self.published_at else None
-            ),
+            "published_at": (self.published_at.isoformat() if self.published_at else None),
             "fetched_at": self.fetched_at.isoformat(),
             "score": self.score,
             "comments_count": self.comments_count,

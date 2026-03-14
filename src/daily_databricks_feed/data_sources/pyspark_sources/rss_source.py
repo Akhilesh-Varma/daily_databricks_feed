@@ -30,7 +30,6 @@ from typing import Iterator, Tuple, Dict, Any, List
 import json
 import hashlib
 
-
 # Default RSS feeds for Databricks content
 DEFAULT_FEEDS = [
     "https://www.databricks.com/blog/feed",
@@ -133,7 +132,9 @@ class RSSFeedReader(DataSourceReader):
                     time_struct = entry.get("published_parsed") or entry.get("updated_parsed")
                     if time_struct:
                         try:
-                            published_at = datetime.fromtimestamp(mktime(time_struct), tz=timezone.utc)
+                            published_at = datetime.fromtimestamp(
+                                mktime(time_struct), tz=timezone.utc
+                            )
                         except (ValueError, OverflowError):
                             pass
 
@@ -202,12 +203,14 @@ class RSSFeedReader(DataSourceReader):
                         0,  # RSS feeds don't have scores
                         0,
                         all_keywords,
-                        json.dumps({
-                            "feed_name": feed_title,
-                            "feed_url": feed_url,
-                            "is_official": is_official,
-                            "guid": entry.get("id") or entry.get("guid"),
-                        }),
+                        json.dumps(
+                            {
+                                "feed_name": feed_title,
+                                "feed_url": feed_url,
+                                "is_official": is_official,
+                                "guid": entry.get("id") or entry.get("guid"),
+                            }
+                        ),
                     )
                     items_yielded += 1
 
@@ -319,7 +322,9 @@ class RSSFeedStreamReader(SimpleDataSourceStreamReader):
                     time_struct = entry.get("published_parsed") or entry.get("updated_parsed")
                     if time_struct:
                         try:
-                            published_at = datetime.fromtimestamp(mktime(time_struct), tz=timezone.utc)
+                            published_at = datetime.fromtimestamp(
+                                mktime(time_struct), tz=timezone.utc
+                            )
                         except:
                             pass
 
@@ -344,24 +349,28 @@ class RSSFeedStreamReader(SimpleDataSourceStreamReader):
 
                     author = entry.get("author")
 
-                    results.append((
-                        item_id,
-                        "rss_feed",
-                        title,
-                        url,
-                        content,
-                        author,
-                        published_at,
-                        fetched_at,
-                        0,
-                        0,
-                        extract_keywords(searchable),
-                        json.dumps({
-                            "feed_name": feed_title,
-                            "feed_url": feed_url,
-                            "is_official": is_official,
-                        }),
-                    ))
+                    results.append(
+                        (
+                            item_id,
+                            "rss_feed",
+                            title,
+                            url,
+                            content,
+                            author,
+                            published_at,
+                            fetched_at,
+                            0,
+                            0,
+                            extract_keywords(searchable),
+                            json.dumps(
+                                {
+                                    "feed_name": feed_title,
+                                    "feed_url": feed_url,
+                                    "is_official": is_official,
+                                }
+                            ),
+                        )
+                    )
                     new_seen_urls.append(url_normalized)
 
             except Exception:
@@ -387,9 +396,7 @@ class RSSFeedStreamReader(SimpleDataSourceStreamReader):
         text = re.sub(r"\s+", " ", text)
         return text.strip()
 
-    def readBetweenOffsets(
-        self, start: Dict[str, Any], end: Dict[str, Any]
-    ) -> Iterator[Tuple]:
+    def readBetweenOffsets(self, start: Dict[str, Any], end: Dict[str, Any]) -> Iterator[Tuple]:
         """Deterministically read between offsets."""
         # RSS feeds don't support exact time range queries
         return iter([])

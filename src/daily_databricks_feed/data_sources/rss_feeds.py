@@ -72,9 +72,7 @@ class RSSFeedSource(BaseDataSource):
         super().__init__(**kwargs)
 
         if not FEEDPARSER_AVAILABLE:
-            self.logger.warning(
-                "feedparser not installed. RSS source will be disabled."
-            )
+            self.logger.warning("feedparser not installed. RSS source will be disabled.")
             self.feeds = []
             return
 

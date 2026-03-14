@@ -98,12 +98,16 @@ class YouTubeReader(DataSourceReader):
         cutoff_time = datetime.now(timezone.utc) - timedelta(days=days_back)
         fetched_at = datetime.now(timezone.utc)
 
-        search_queries = [query] if query != "databricks" else [
-            "databricks tutorial",
-            "databricks",
-            "delta lake",
-            "apache spark tutorial",
-        ]
+        search_queries = (
+            [query]
+            if query != "databricks"
+            else [
+                "databricks tutorial",
+                "databricks",
+                "delta lake",
+                "apache spark tutorial",
+            ]
+        )
 
         seen_ids = set()
 
@@ -204,13 +208,17 @@ class YouTubeReader(DataSourceReader):
                         video_stats.get("view_count", 0),
                         video_stats.get("comment_count", 0),
                         extract_keywords(searchable),
-                        json.dumps({
-                            "video_id": video_id,
-                            "channel_id": snippet.get("channelId"),
-                            "channel_title": snippet.get("channelTitle"),
-                            "thumbnail_url": snippet.get("thumbnails", {}).get("high", {}).get("url"),
-                            "like_count": video_stats.get("like_count", 0),
-                        }),
+                        json.dumps(
+                            {
+                                "video_id": video_id,
+                                "channel_id": snippet.get("channelId"),
+                                "channel_title": snippet.get("channelTitle"),
+                                "thumbnail_url": snippet.get("thumbnails", {})
+                                .get("high", {})
+                                .get("url"),
+                                "like_count": video_stats.get("like_count", 0),
+                            }
+                        ),
                     )
 
             except Exception:
@@ -273,7 +281,11 @@ class YouTubeStreamReader(SimpleDataSourceStreamReader):
                     "q": search_query,
                     "type": "video",
                     "order": "date",
-                    "publishedAfter": published_after.replace("+00:00", "Z") if "+00:00" in published_after else published_after,
+                    "publishedAfter": (
+                        published_after.replace("+00:00", "Z")
+                        if "+00:00" in published_after
+                        else published_after
+                    ),
                     "maxResults": min(limit, 25),
                     "relevanceLanguage": "en",
                 }
@@ -317,24 +329,28 @@ class YouTubeStreamReader(SimpleDataSourceStreamReader):
                         if published_at_str > latest_published:
                             latest_published = published_at_str
 
-                    results.append((
-                        item_id,
-                        "youtube",
-                        title,
-                        f"https://www.youtube.com/watch?v={video_id}",
-                        description,
-                        snippet.get("channelTitle"),
-                        published_at,
-                        fetched_at,
-                        0,  # Would need separate API call for stats
-                        0,
-                        extract_keywords(searchable),
-                        json.dumps({
-                            "video_id": video_id,
-                            "channel_id": snippet.get("channelId"),
-                            "channel_title": snippet.get("channelTitle"),
-                        }),
-                    ))
+                    results.append(
+                        (
+                            item_id,
+                            "youtube",
+                            title,
+                            f"https://www.youtube.com/watch?v={video_id}",
+                            description,
+                            snippet.get("channelTitle"),
+                            published_at,
+                            fetched_at,
+                            0,  # Would need separate API call for stats
+                            0,
+                            extract_keywords(searchable),
+                            json.dumps(
+                                {
+                                    "video_id": video_id,
+                                    "channel_id": snippet.get("channelId"),
+                                    "channel_title": snippet.get("channelTitle"),
+                                }
+                            ),
+                        )
+                    )
 
             except Exception:
                 continue
@@ -343,9 +359,7 @@ class YouTubeStreamReader(SimpleDataSourceStreamReader):
 
         return (iter(results), next_offset)
 
-    def readBetweenOffsets(
-        self, start: Dict[str, Any], end: Dict[str, Any]
-    ) -> Iterator[Tuple]:
+    def readBetweenOffsets(self, start: Dict[str, Any], end: Dict[str, Any]) -> Iterator[Tuple]:
         """Deterministically read between offsets."""
         # YouTube API doesn't support exact time range queries well
         # Return empty for replay

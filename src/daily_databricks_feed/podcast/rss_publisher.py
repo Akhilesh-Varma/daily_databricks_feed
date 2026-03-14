@@ -123,9 +123,7 @@ class RSSPublisher:
             base_url: Base URL for audio files (e.g., https://storage.googleapis.com/bucket)
         """
         self.bucket_name = bucket_name or os.environ.get("GCS_BUCKET_NAME")
-        self.credentials_json = credentials_json or os.environ.get(
-            "GCP_SERVICE_ACCOUNT_JSON"
-        )
+        self.credentials_json = credentials_json or os.environ.get("GCP_SERVICE_ACCOUNT_JSON")
         self.base_url = base_url or os.environ.get("AUDIO_BASE_URL", "")
 
         self._gcs_client = None
@@ -134,8 +132,7 @@ class RSSPublisher:
         """Get or create GCS client."""
         if not GCS_AVAILABLE:
             raise ImportError(
-                "google-cloud-storage not installed. "
-                "Run: pip install google-cloud-storage"
+                "google-cloud-storage not installed. " "Run: pip install google-cloud-storage"
             )
 
         if self._gcs_client is None:
@@ -143,9 +140,7 @@ class RSSPublisher:
                 from google.oauth2 import service_account
 
                 creds_dict = json.loads(self.credentials_json)
-                credentials = service_account.Credentials.from_service_account_info(
-                    creds_dict
-                )
+                credentials = service_account.Credentials.from_service_account_info(creds_dict)
                 self._gcs_client = storage.Client(credentials=credentials)
             else:
                 self._gcs_client = storage.Client()
@@ -262,22 +257,16 @@ class RSSPublisher:
         ET.SubElement(item, f"{{{self.ITUNES_NS}}}episodeType").text = "full"
 
         if episode.episode_number > 0:
-            ET.SubElement(item, f"{{{self.ITUNES_NS}}}episode").text = str(
-                episode.episode_number
-            )
+            ET.SubElement(item, f"{{{self.ITUNES_NS}}}episode").text = str(episode.episode_number)
         if episode.season_number > 0:
-            ET.SubElement(item, f"{{{self.ITUNES_NS}}}season").text = str(
-                episode.season_number
-            )
+            ET.SubElement(item, f"{{{self.ITUNES_NS}}}season").text = str(episode.season_number)
 
         if episode.image_url:
             itunes_image = ET.SubElement(item, f"{{{self.ITUNES_NS}}}image")
             itunes_image.set("href", episode.image_url)
 
         if episode.keywords:
-            ET.SubElement(item, f"{{{self.ITUNES_NS}}}keywords").text = ",".join(
-                episode.keywords
-            )
+            ET.SubElement(item, f"{{{self.ITUNES_NS}}}keywords").text = ",".join(episode.keywords)
 
     def _format_rfc822(self, dt: datetime) -> str:
         """Format datetime as RFC 822 string."""

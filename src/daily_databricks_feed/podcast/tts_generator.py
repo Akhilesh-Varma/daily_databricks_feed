@@ -138,9 +138,7 @@ class TTSGenerator:
             female_voice: Voice config for female segments
             male_voice: Voice config for male segments
         """
-        self.credentials_json = credentials_json or os.environ.get(
-            "GCP_SERVICE_ACCOUNT_JSON"
-        )
+        self.credentials_json = credentials_json or os.environ.get("GCP_SERVICE_ACCOUNT_JSON")
         self.female_voice = female_voice
         self.male_voice = male_voice
         self._access_token: Optional[str] = None
@@ -153,9 +151,7 @@ class TTSGenerator:
     def _get_access_token(self) -> str:
         """Get OAuth2 access token for Google Cloud API."""
         if not self.credentials_json:
-            raise ValueError(
-                "GCP credentials not configured. Set GCP_SERVICE_ACCOUNT_JSON."
-            )
+            raise ValueError("GCP credentials not configured. Set GCP_SERVICE_ACCOUNT_JSON.")
 
         # Check if token is still valid
         if self._access_token and self._token_expiry:
@@ -284,9 +280,7 @@ class TTSGenerator:
         if script.get("intro"):
             logger.info("Generating intro audio...")
             intro_ssml = self._wrap_ssml(script["intro"], add_pause_after=True)
-            intro_audio = self._synthesize_speech(
-                intro_ssml, self.female_voice, use_ssml=True
-            )
+            intro_audio = self._synthesize_speech(intro_ssml, self.female_voice, use_ssml=True)
             segments.append(
                 AudioSegmentInfo(
                     segment_type="intro",
@@ -329,9 +323,7 @@ class TTSGenerator:
         if script.get("outro"):
             logger.info("Generating outro audio...")
             outro_ssml = self._wrap_ssml(script["outro"], add_pause_before=True)
-            outro_audio = self._synthesize_speech(
-                outro_ssml, self.female_voice, use_ssml=True
-            )
+            outro_audio = self._synthesize_speech(outro_ssml, self.female_voice, use_ssml=True)
             segments.append(
                 AudioSegmentInfo(
                     segment_type="outro",

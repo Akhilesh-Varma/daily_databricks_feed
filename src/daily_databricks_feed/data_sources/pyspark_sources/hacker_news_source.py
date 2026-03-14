@@ -91,9 +91,11 @@ class HackerNewsReader(DataSourceReader):
         cutoff_timestamp = int(cutoff_time.timestamp())
 
         # Search queries
-        search_queries = [query] if query != "databricks" else [
-            "databricks", "delta lake", "apache spark", "lakehouse", "mlflow"
-        ]
+        search_queries = (
+            [query]
+            if query != "databricks"
+            else ["databricks", "delta lake", "apache spark", "lakehouse", "mlflow"]
+        )
 
         seen_ids = set()
         fetched_at = datetime.now(timezone.utc)
@@ -134,9 +136,7 @@ class HackerNewsReader(DataSourceReader):
                     # Parse timestamp
                     published_at = None
                     if hit.get("created_at_i"):
-                        published_at = datetime.fromtimestamp(
-                            hit["created_at_i"], tz=timezone.utc
-                        )
+                        published_at = datetime.fromtimestamp(hit["created_at_i"], tz=timezone.utc)
 
                     url = hit.get("url") or f"https://news.ycombinator.com/item?id={object_id}"
 
@@ -152,10 +152,12 @@ class HackerNewsReader(DataSourceReader):
                         hit.get("points", 0),
                         hit.get("num_comments", 0),
                         extract_keywords(searchable),
-                        json.dumps({
-                            "hn_id": object_id,
-                            "hn_url": f"https://news.ycombinator.com/item?id={object_id}",
-                        }),
+                        json.dumps(
+                            {
+                                "hn_id": object_id,
+                                "hn_url": f"https://news.ycombinator.com/item?id={object_id}",
+                            }
+                        ),
                     )
 
                     if len(seen_ids) >= limit:
@@ -213,9 +215,9 @@ class HackerNewsStreamReader(SimpleDataSourceStreamReader):
 
         results = []
 
-        search_queries = [query] if query != "databricks" else [
-            "databricks", "delta lake", "apache spark"
-        ]
+        search_queries = (
+            [query] if query != "databricks" else ["databricks", "delta lake", "apache spark"]
+        )
 
         seen_ids = set()
 
@@ -262,23 +264,27 @@ class HackerNewsStreamReader(SimpleDataSourceStreamReader):
 
                     url = hit.get("url") or f"https://news.ycombinator.com/item?id={object_id}"
 
-                    results.append((
-                        item_id,
-                        "hacker_news",
-                        title,
-                        url,
-                        story_text,
-                        hit.get("author"),
-                        published_at,
-                        fetched_at,
-                        hit.get("points", 0),
-                        hit.get("num_comments", 0),
-                        extract_keywords(searchable),
-                        json.dumps({
-                            "hn_id": object_id,
-                            "hn_url": f"https://news.ycombinator.com/item?id={object_id}",
-                        }),
-                    ))
+                    results.append(
+                        (
+                            item_id,
+                            "hacker_news",
+                            title,
+                            url,
+                            story_text,
+                            hit.get("author"),
+                            published_at,
+                            fetched_at,
+                            hit.get("points", 0),
+                            hit.get("num_comments", 0),
+                            extract_keywords(searchable),
+                            json.dumps(
+                                {
+                                    "hn_id": object_id,
+                                    "hn_url": f"https://news.ycombinator.com/item?id={object_id}",
+                                }
+                            ),
+                        )
+                    )
 
             except Exception:
                 continue
@@ -291,9 +297,7 @@ class HackerNewsStreamReader(SimpleDataSourceStreamReader):
 
         return (iter(results), next_offset)
 
-    def readBetweenOffsets(
-        self, start: Dict[str, Any], end: Dict[str, Any]
-    ) -> Iterator[Tuple]:
+    def readBetweenOffsets(self, start: Dict[str, Any], end: Dict[str, Any]) -> Iterator[Tuple]:
         """
         Deterministically read between offsets (for replay after failure).
         """
@@ -368,10 +372,12 @@ class HackerNewsStreamReader(SimpleDataSourceStreamReader):
                         hit.get("points", 0),
                         hit.get("num_comments", 0),
                         extract_keywords(searchable),
-                        json.dumps({
-                            "hn_id": object_id,
-                            "hn_url": f"https://news.ycombinator.com/item?id={object_id}",
-                        }),
+                        json.dumps(
+                            {
+                                "hn_id": object_id,
+                                "hn_url": f"https://news.ycombinator.com/item?id={object_id}",
+                            }
+                        ),
                     )
 
             except Exception:

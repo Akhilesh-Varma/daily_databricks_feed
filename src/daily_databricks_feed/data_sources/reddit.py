@@ -221,9 +221,7 @@ class RedditSource(BaseDataSource):
                 return None
 
             # Check time threshold
-            created_at = datetime.fromtimestamp(
-                submission.created_utc, tz=timezone.utc
-            )
+            created_at = datetime.fromtimestamp(submission.created_utc, tz=timezone.utc)
             if created_at < cutoff_time:
                 return None
 

@@ -80,9 +80,7 @@ class GroqProvider(LLMProvider):
             "temperature": 0.7,
         }
 
-        response = requests.post(
-            self.BASE_URL, headers=headers, json=data, timeout=60
-        )
+        response = requests.post(self.BASE_URL, headers=headers, json=data, timeout=60)
         response.raise_for_status()
 
         result = response.json()
@@ -96,9 +94,7 @@ class AnthropicProvider(LLMProvider):
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = (
-            api_key
-            or os.environ.get("CLAUDE_API_KEY")
-            or os.environ.get("ANTHROPIC_API_KEY")
+            api_key or os.environ.get("CLAUDE_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
         )
 
     def is_available(self) -> bool:
@@ -121,9 +117,7 @@ class AnthropicProvider(LLMProvider):
             "messages": [{"role": "user", "content": prompt}],
         }
 
-        response = requests.post(
-            self.BASE_URL, headers=headers, json=data, timeout=60
-        )
+        response = requests.post(self.BASE_URL, headers=headers, json=data, timeout=60)
         response.raise_for_status()
 
         result = response.json()
@@ -133,7 +127,9 @@ class AnthropicProvider(LLMProvider):
 class GeminiProvider(LLMProvider):
     """Google Gemini API provider."""
 
-    BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+    BASE_URL = (
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+    )
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.environ.get("GOOGLE_API_KEY")
@@ -294,9 +290,7 @@ class ScriptGenerator:
             },
         )
 
-    def _build_prompt(
-        self, stories: List[Dict[str, Any]], date_str: str, podcast_name: str
-    ) -> str:
+    def _build_prompt(self, stories: List[Dict[str, Any]], date_str: str, podcast_name: str) -> str:
         """Build the prompt for script generation."""
         stories_text = ""
         for i, story in enumerate(stories[:10], 1):  # Limit to 10 stories
@@ -408,10 +402,10 @@ Format the script with clear section markers:
         Returns:
             SSML-formatted string
         """
-        ssml_parts = ['<speak>']
+        ssml_parts = ["<speak>"]
 
         # Intro with medium pause after
-        ssml_parts.append(f'<p>{script.intro}</p>')
+        ssml_parts.append(f"<p>{script.intro}</p>")
         ssml_parts.append('<break time="1s"/>')
 
         # Stories with pauses between
@@ -421,11 +415,11 @@ Format the script with clear section markers:
 
         # Outro
         ssml_parts.append('<break time="1s"/>')
-        ssml_parts.append(f'<p>{script.outro}</p>')
+        ssml_parts.append(f"<p>{script.outro}</p>")
 
-        ssml_parts.append('</speak>')
+        ssml_parts.append("</speak>")
 
-        return '\n'.join(ssml_parts)
+        return "\n".join(ssml_parts)
 
 
 def select_top_stories(
@@ -448,9 +442,7 @@ def select_top_stories(
         return []
 
     # Sort by quality score
-    sorted_items = sorted(
-        items, key=lambda x: x.get("quality_score", 0), reverse=True
-    )
+    sorted_items = sorted(items, key=lambda x: x.get("quality_score", 0), reverse=True)
 
     selected = []
     source_counts: Dict[str, int] = {}

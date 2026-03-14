@@ -37,9 +37,7 @@ class NewsItem:
             "url": self.url,
             "content": self.content,
             "author": self.author,
-            "published_at": (
-                self.published_at.isoformat() if self.published_at else None
-            ),
+            "published_at": (self.published_at.isoformat() if self.published_at else None),
             "fetched_at": self.fetched_at.isoformat(),
             "score": self.score,
             "comments_count": self.comments_count,
@@ -207,9 +205,7 @@ class BaseDataSource(ABC):
             if self.is_databricks_related(searchable_text):
                 filtered.append(item)
 
-        self.logger.info(
-            f"Filtered {len(items)} items to {len(filtered)} Databricks-related items"
-        )
+        self.logger.info(f"Filtered {len(items)} items to {len(filtered)} Databricks-related items")
         return filtered
 
     def extract_keywords(self, text: str) -> List[str]:

@@ -220,9 +220,7 @@ class YouTubeSource(BaseDataSource):
             self.logger.warning(f"Error fetching video statistics: {e}")
             return {}
 
-    def _parse_search_results(
-        self, items: List[dict], stats: dict
-    ) -> List[NewsItem]:
+    def _parse_search_results(self, items: List[dict], stats: dict) -> List[NewsItem]:
         """
         Parse YouTube search results into NewsItem objects.
 
@@ -273,9 +271,7 @@ class YouTubeSource(BaseDataSource):
                         "video_id": video_id,
                         "channel_id": snippet.get("channelId"),
                         "channel_title": snippet.get("channelTitle"),
-                        "thumbnail_url": snippet.get("thumbnails", {})
-                        .get("high", {})
-                        .get("url"),
+                        "thumbnail_url": snippet.get("thumbnails", {}).get("high", {}).get("url"),
                         "like_count": video_stats.get("like_count", 0),
                     },
                 )
@@ -320,7 +316,9 @@ class YouTubeSource(BaseDataSource):
         try:
             data = self._make_request("search", params)
             items = data.get("items", [])
-            video_ids = [item["id"]["videoId"] for item in items if item.get("id", {}).get("videoId")]
+            video_ids = [
+                item["id"]["videoId"] for item in items if item.get("id", {}).get("videoId")
+            ]
             stats = self._get_video_statistics(video_ids) if video_ids else {}
             return self._parse_search_results(items, stats)
         except Exception as e:

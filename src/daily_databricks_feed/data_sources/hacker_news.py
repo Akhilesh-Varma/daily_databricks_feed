@@ -162,9 +162,7 @@ class HackerNewsSource(BaseDataSource):
                 # Parse timestamp
                 created_at = None
                 if hit.get("created_at_i"):
-                    created_at = datetime.fromtimestamp(
-                        hit["created_at_i"], tz=timezone.utc
-                    )
+                    created_at = datetime.fromtimestamp(hit["created_at_i"], tz=timezone.utc)
 
                 # Build HN URL
                 object_id = hit.get("objectID", "")
@@ -206,9 +204,7 @@ class HackerNewsSource(BaseDataSource):
             List of NewsItem objects
         """
         # Get top story IDs from official API
-        response = requests.get(
-            "https://hacker-news.firebaseio.com/v0/topstories.json", timeout=30
-        )
+        response = requests.get("https://hacker-news.firebaseio.com/v0/topstories.json", timeout=30)
         response.raise_for_status()
         story_ids = response.json()[:limit]
 

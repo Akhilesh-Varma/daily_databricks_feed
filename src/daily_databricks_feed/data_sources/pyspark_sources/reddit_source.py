@@ -130,8 +130,9 @@ class RedditReader(DataSourceReader):
                 subreddit = reddit.subreddit(subreddit_name)
 
                 # Fetch from hot and new
-                for submission in list(subreddit.hot(limit=limit // len(subreddits))) + \
-                                  list(subreddit.new(limit=limit // len(subreddits))):
+                for submission in list(subreddit.hot(limit=limit // len(subreddits))) + list(
+                    subreddit.new(limit=limit // len(subreddits))
+                ):
 
                     if items_yielded >= limit:
                         break
@@ -146,9 +147,7 @@ class RedditReader(DataSourceReader):
                         continue
 
                     # Check time
-                    created_at = datetime.fromtimestamp(
-                        submission.created_utc, tz=timezone.utc
-                    )
+                    created_at = datetime.fromtimestamp(submission.created_utc, tz=timezone.utc)
                     if created_at < cutoff_time:
                         continue
 
@@ -181,14 +180,16 @@ class RedditReader(DataSourceReader):
                         submission.score,
                         submission.num_comments,
                         extract_keywords(searchable),
-                        json.dumps({
-                            "subreddit": subreddit_name,
-                            "reddit_id": submission.id,
-                            "permalink": f"https://reddit.com{submission.permalink}",
-                            "is_self": submission.is_self,
-                            "upvote_ratio": submission.upvote_ratio,
-                            "flair": submission.link_flair_text,
-                        }),
+                        json.dumps(
+                            {
+                                "subreddit": subreddit_name,
+                                "reddit_id": submission.id,
+                                "permalink": f"https://reddit.com{submission.permalink}",
+                                "is_self": submission.is_self,
+                                "upvote_ratio": submission.upvote_ratio,
+                                "flair": submission.link_flair_text,
+                            }
+                        ),
                     )
                     items_yielded += 1
 
@@ -269,9 +270,7 @@ class RedditStreamReader(SimpleDataSourceStreamReader):
                     if submission.score < min_score:
                         continue
 
-                    created_at = datetime.fromtimestamp(
-                        submission.created_utc, tz=timezone.utc
-                    )
+                    created_at = datetime.fromtimestamp(submission.created_utc, tz=timezone.utc)
 
                     # Only get posts after start timestamp
                     if submission.created_utc <= start_timestamp:
@@ -296,25 +295,29 @@ class RedditStreamReader(SimpleDataSourceStreamReader):
 
                     author_name = str(submission.author) if submission.author else None
 
-                    results.append((
-                        item_id,
-                        "reddit",
-                        title,
-                        url,
-                        content,
-                        author_name,
-                        created_at,
-                        fetched_at,
-                        submission.score,
-                        submission.num_comments,
-                        extract_keywords(searchable),
-                        json.dumps({
-                            "subreddit": subreddit_name,
-                            "reddit_id": submission.id,
-                            "permalink": f"https://reddit.com{submission.permalink}",
-                            "is_self": submission.is_self,
-                        }),
-                    ))
+                    results.append(
+                        (
+                            item_id,
+                            "reddit",
+                            title,
+                            url,
+                            content,
+                            author_name,
+                            created_at,
+                            fetched_at,
+                            submission.score,
+                            submission.num_comments,
+                            extract_keywords(searchable),
+                            json.dumps(
+                                {
+                                    "subreddit": subreddit_name,
+                                    "reddit_id": submission.id,
+                                    "permalink": f"https://reddit.com{submission.permalink}",
+                                    "is_self": submission.is_self,
+                                }
+                            ),
+                        )
+                    )
                     new_seen_ids.append(item_id)
 
             except Exception:
@@ -324,15 +327,15 @@ class RedditStreamReader(SimpleDataSourceStreamReader):
         new_seen_ids = new_seen_ids[-1000:]
 
         next_offset = {
-            "timestamp": max_timestamp if max_timestamp > start_timestamp else int(fetched_at.timestamp()),
+            "timestamp": (
+                max_timestamp if max_timestamp > start_timestamp else int(fetched_at.timestamp())
+            ),
             "seen_ids": new_seen_ids,
         }
 
         return (iter(results), next_offset)
 
-    def readBetweenOffsets(
-        self, start: Dict[str, Any], end: Dict[str, Any]
-    ) -> Iterator[Tuple]:
+    def readBetweenOffsets(self, start: Dict[str, Any], end: Dict[str, Any]) -> Iterator[Tuple]:
         """Deterministically read between offsets."""
         # For Reddit, we can't perfectly replay due to API limitations
         # Return empty iterator for replay scenarios

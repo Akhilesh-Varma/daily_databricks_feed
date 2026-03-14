@@ -14,6 +14,7 @@ try:
         YouTubeDataSource,
         RSSFeedDataSource,
     )
+
     PYSPARK_SOURCES_AVAILABLE = True
 except ImportError:
     PYSPARK_SOURCES_AVAILABLE = False
