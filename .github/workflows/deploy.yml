@@ -39,13 +39,17 @@ jobs:
       - name: Install Databricks CLI
         uses: databricks/setup-cli@main
 
-      # ── Explicitly configure CLI to override any stale ~/.databrickscfg ───
-      # setup-cli@main may write a config file with unexpanded $DATABRICKS_HOST
-      # which causes: Error: parse "https://$<host>": invalid character in host
+      # ── Write ~/.databrickscfg directly to avoid setup-cli template issue ──
+      # setup-cli@main may write a config with unexpanded $DATABRICKS_HOST,
+      # causing: Error: parse "https://$<host>": invalid character in host.
+      # Writing the file directly ensures env vars are expanded at write time.
       - name: Configure Databricks CLI
         run: |
-          rm -f ~/.databrickscfg
-          databricks configure --host "$DATABRICKS_HOST" --token "$DATABRICKS_TOKEN"
+          cat > ~/.databrickscfg <<EOF
+          [DEFAULT]
+          host = ${DATABRICKS_HOST}
+          token = ${DATABRICKS_TOKEN}
+          EOF
 
       # ── Verify auth before doing anything ─────────────────────────────────
       - name: Verify Databricks auth
