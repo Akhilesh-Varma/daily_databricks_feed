@@ -24,7 +24,7 @@ on:
         default: "1"
 
 env:
-  DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+  DATABRICKS_HOST: https://dbc-438ac3cd-0325.cloud.databricks.com
   DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
   TARGET: ${{ github.event.inputs.target || 'prod' }}
 
@@ -40,9 +40,6 @@ jobs:
         uses: databricks/setup-cli@main
 
       # ── Write ~/.databrickscfg directly to avoid setup-cli template issue ──
-      # setup-cli@main may write a config with unexpanded $DATABRICKS_HOST,
-      # causing: Error: parse "https://$<host>": invalid character in host.
-      # Writing the file directly ensures env vars are expanded at write time.
       - name: Configure Databricks CLI
         run: |
           cat > ~/.databrickscfg <<EOF
@@ -113,4 +110,4 @@ jobs:
       - name: Notify failure
         run: |
           echo "Podcast pipeline failed on target: ${{ github.event.inputs.target || 'prod' }}"
-          echo "Workspace: ${{ secrets.DATABRICKS_HOST }}"
+          echo "Workspace: $DATABRICKS_HOST"

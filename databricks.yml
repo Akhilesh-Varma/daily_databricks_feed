@@ -81,7 +81,7 @@ targets:
     mode: development
     default: true
     workspace:
-      host: ${DATABRICKS_HOST}
+      host: https://dbc-438ac3cd-0325.cloud.databricks.com
     variables:
       data_path: "/Workspace/${workspace.current_user.userName}/daily_databricks_feed/dev/data"
       notification_email: ""
@@ -91,7 +91,7 @@ targets:
   staging:
     mode: development
     workspace:
-      host: ${DATABRICKS_HOST}
+      host: https://dbc-438ac3cd-0325.cloud.databricks.com
     variables:
       data_path: "/Workspace/Shared/daily_databricks_feed/staging/data"
     run_as:
@@ -100,7 +100,7 @@ targets:
   prod:
     mode: production
     workspace:
-      host: ${DATABRICKS_HOST}
+      host: https://dbc-438ac3cd-0325.cloud.databricks.com
       root_path: /Workspace/Shared/daily_databricks_feed/prod
     variables:
       data_path: "/Volumes/main/default/podcast_data"
