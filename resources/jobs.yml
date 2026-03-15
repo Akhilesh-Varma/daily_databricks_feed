@@ -23,7 +23,7 @@ resources:
       environments:
         - environment_key: "default"
           spec:
-            client: "1"
+            client: "2"
             dependencies:
               - requests>=2.31.0
               - praw>=7.7.0
