@@ -10,7 +10,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install requests pydub google-auth
+# MAGIC %pip install requests google-auth
 
 # COMMAND ----------
 
