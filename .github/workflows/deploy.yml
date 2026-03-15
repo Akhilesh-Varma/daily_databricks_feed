@@ -39,12 +39,13 @@ jobs:
       - name: Install Databricks CLI
         uses: databricks/setup-cli@main
 
-      # ── Debug: show host length and hex to catch invisible chars ──────────
-      - name: Debug host format
+      # ── Explicitly configure CLI to override any stale ~/.databrickscfg ───
+      # setup-cli@main may write a config file with unexpanded $DATABRICKS_HOST
+      # which causes: Error: parse "https://$<host>": invalid character in host
+      - name: Configure Databricks CLI
         run: |
-          echo "Host length: ${#DATABRICKS_HOST}"
-          echo "$DATABRICKS_HOST" | cat -A
-          printf '%s' "$DATABRICKS_HOST" | od -c | head -3
+          rm -f ~/.databrickscfg
+          databricks configure --host "$DATABRICKS_HOST" --token "$DATABRICKS_TOKEN"
 
       # ── Verify auth before doing anything ─────────────────────────────────
       - name: Verify Databricks auth
