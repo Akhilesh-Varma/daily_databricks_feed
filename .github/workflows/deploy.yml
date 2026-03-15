@@ -42,11 +42,7 @@ jobs:
       # ── Write ~/.databrickscfg directly to avoid setup-cli template issue ──
       - name: Configure Databricks CLI
         run: |
-          cat > ~/.databrickscfg <<EOF
-          [DEFAULT]
-          host = ${DATABRICKS_HOST}
-          token = ${DATABRICKS_TOKEN}
-          EOF
+          printf '[DEFAULT]\nhost = %s\ntoken = %s\n' "$DATABRICKS_HOST" "$DATABRICKS_TOKEN" > ~/.databrickscfg
 
       # ── Verify auth before doing anything ─────────────────────────────────
       - name: Verify Databricks auth
