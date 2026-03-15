@@ -28,7 +28,6 @@ resources:
               - requests>=2.31.0
               - praw>=7.7.0
               - feedparser>=6.0.0
-              - pydub>=0.25.0
               - google-auth>=2.22.0
               - google-cloud-storage>=2.10.0
               - google-cloud-texttospeech>=2.14.0
