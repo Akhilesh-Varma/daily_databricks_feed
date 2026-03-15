@@ -104,12 +104,6 @@ resources:
 
       max_concurrent_runs: 1
 
-      email_notifications:
-        on_failure:
-          - ${var.notification_email}
-        on_success:
-          - ${var.notification_email}
-
       tags:
         project: "daily-databricks-podcast"
         environment: "${bundle.target}"

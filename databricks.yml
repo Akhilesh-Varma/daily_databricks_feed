@@ -20,10 +20,6 @@ variables:
     description: "Name of the podcast"
     default: "Daily Databricks Digest"
 
-  notification_email:
-    description: "Email for job notifications"
-    default: "noreply@example.com"
-
   # ── API secrets (passed via --var in deploy.yml) ─────────────────────────────
   reddit_client_id:
     description: "Reddit OAuth client ID"
@@ -84,7 +80,6 @@ targets:
       host: https://dbc-438ac3cd-0325.cloud.databricks.com
     variables:
       data_path: "/Workspace/${workspace.current_user.userName}/daily_databricks_feed/dev/data"
-      notification_email: ""
     run_as:
       user_name: ${workspace.current_user.userName}
 
@@ -104,7 +99,6 @@ targets:
       root_path: /Workspace/Shared/daily_databricks_feed/prod
     variables:
       data_path: "/Volumes/main/default/podcast_data"
-      notification_email: ${NOTIFICATION_EMAIL}
     run_as:
       service_principal_name: ${SERVICE_PRINCIPAL_NAME}
     permissions:
