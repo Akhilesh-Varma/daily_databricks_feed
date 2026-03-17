@@ -25,6 +25,7 @@ resources:
           spec:
             client: "2"
             dependencies:
+              - ${workspace.root_path}/artifacts/.internal/daily_databricks_feed-0.1.0-py3-none-any.whl
               - requests>=2.31.0
               - praw>=7.7.0
               - feedparser>=6.0.0

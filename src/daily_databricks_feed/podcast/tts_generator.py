@@ -436,27 +436,8 @@ class TTSGenerator:
         if len(segments) == 1:
             return segments[0].audio_data
 
-        if not PYDUB_AVAILABLE:
-            # Without pydub, concatenate raw bytes
-            # This works for MP3 but may have audio glitches
-            logger.warning(
-                "pydub not available - concatenating raw MP3 bytes. "
-                "Install pydub for better audio quality."
-            )
-            return b"".join(seg.audio_data for seg in segments)
-
-        # Use pydub for proper audio stitching
-        combined = AudioSegment.empty()
-
-        for seg in segments:
-            # Load segment from bytes
-            audio = AudioSegment.from_mp3(io.BytesIO(seg.audio_data))
-            combined += audio
-
-        # Export to MP3 bytes
-        output = io.BytesIO()
-        combined.export(output, format="mp3", bitrate="192k")
-        return output.getvalue()
+        # Concatenate raw MP3 bytes — ffmpeg is not available in serverless
+        return b"".join(seg.audio_data for seg in segments)
 
 
 class MockTTSGenerator(TTSGenerator):
@@ -471,20 +452,9 @@ class MockTTSGenerator(TTSGenerator):
         self.credentials_json = "mock"  # Mark as available
 
     def _synthesize_speech(self, text: str, voice: VoiceConfig, use_ssml: bool = False) -> bytes:
-        """Generate silent audio for testing."""
+        """Generate silent audio for testing (no ffmpeg required)."""
         logger.info(f"Mock TTS: generating silent audio for {len(text)} chars")
-
-        if not PYDUB_AVAILABLE:
-            # Return minimal valid MP3 header
-            return self._minimal_mp3()
-
-        # Generate silent audio of appropriate duration
-        duration_ms = self._estimate_duration(text)
-        silent = AudioSegment.silent(duration=duration_ms)
-
-        output = io.BytesIO()
-        silent.export(output, format="mp3")
-        return output.getvalue()
+        return self._minimal_mp3()
 
     def _minimal_mp3(self) -> bytes:
         """Return minimal valid MP3 bytes for testing."""
