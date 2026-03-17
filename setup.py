@@ -34,7 +34,6 @@ setup(
         "python-dotenv>=1.0.0",
         "praw>=7.7.0",
         "feedparser>=6.0.0",
-        "pydub>=0.25.0",
     ],
     extras_require={
         "gcp": [
@@ -51,9 +50,5 @@ setup(
             "mypy>=1.5.0",
         ],
     },
-    entry_points={
-        "console_scripts": [
-            "databricks-podcast=daily_databricks_feed.cli:main",
-        ],
-    },
+    entry_points={},
 )

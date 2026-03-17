@@ -83,6 +83,7 @@ class YouTubeSource(BaseDataSource):
         self,
         query: Optional[str] = None,
         days_back: int = 7,
+        since_epoch: Optional[int] = None,
         limit: int = 50,
         filter_databricks: bool = True,
     ) -> List[NewsItem]:
@@ -91,7 +92,10 @@ class YouTubeSource(BaseDataSource):
 
         Args:
             query: Search query (if None, searches for Databricks keywords)
-            days_back: Number of days to look back
+            days_back: Number of days to look back (used only when since_epoch is None)
+            since_epoch: Unix epoch of the earliest allowed publish time.
+                         When set, takes precedence over days_back so that the
+                         PySpark checkpoint boundary is used exactly as publishedAfter.
             limit: Maximum number of items to return
             filter_databricks: Whether to filter for Databricks-related content
 
@@ -117,8 +121,11 @@ class YouTubeSource(BaseDataSource):
             ]
         )
 
-        # Calculate timestamp for date filter
-        cutoff_time = datetime.now(timezone.utc) - timedelta(days=days_back)
+        # since_epoch takes precedence — use checkpoint boundary directly
+        if since_epoch is not None:
+            cutoff_time = datetime.fromtimestamp(since_epoch, tz=timezone.utc)
+        else:
+            cutoff_time = datetime.now(timezone.utc) - timedelta(days=days_back)
 
         for search_query in search_queries:
             try:
@@ -282,59 +289,3 @@ class YouTubeSource(BaseDataSource):
 
         return news_items
 
-    def get_channel_videos(
-        self,
-        channel_id: str,
-        days_back: int = 7,
-        limit: int = 10,
-    ) -> List[NewsItem]:
-        """
-        Get recent videos from a specific channel.
-
-        Args:
-            channel_id: YouTube channel ID
-            days_back: Number of days to look back
-            limit: Maximum results
-
-        Returns:
-            List of NewsItem objects
-        """
-        if not self.is_available():
-            return []
-
-        cutoff_time = datetime.now(timezone.utc) - timedelta(days=days_back)
-
-        params = {
-            "part": "snippet",
-            "channelId": channel_id,
-            "type": "video",
-            "order": "date",
-            "publishedAfter": cutoff_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "maxResults": min(limit, 50),
-        }
-
-        try:
-            data = self._make_request("search", params)
-            items = data.get("items", [])
-            video_ids = [
-                item["id"]["videoId"] for item in items if item.get("id", {}).get("videoId")
-            ]
-            stats = self._get_video_statistics(video_ids) if video_ids else {}
-            return self._parse_search_results(items, stats)
-        except Exception as e:
-            self.logger.error(f"Error fetching channel videos: {e}")
-            return []
-
-    def get_databricks_channel_videos(self, days_back: int = 7) -> List[NewsItem]:
-        """
-        Get recent videos from the official Databricks YouTube channel.
-
-        Args:
-            days_back: Number of days to look back
-
-        Returns:
-            List of NewsItem objects
-        """
-        # Databricks official channel ID
-        databricks_channel_id = "UCTPjwxo4K0r7-qYdPV2l-4A"
-        return self.get_channel_videos(databricks_channel_id, days_back=days_back)

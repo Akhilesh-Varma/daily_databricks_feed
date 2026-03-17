@@ -71,7 +71,7 @@ for record in bronze_records:
         if record.get("published_at"):
             try:
                 published_at = datetime.fromisoformat(record["published_at"].replace("Z", "+00:00"))
-            except:
+            except (ValueError, TypeError):
                 pass
 
         fetched_at = datetime.now(timezone.utc)
@@ -176,8 +176,12 @@ logger.info(f"Ranked {len(ranked_items)} items")
 
 # COMMAND ----------
 
-# Convert to dictionaries
-silver_records = [item.to_dict() for item in ranked_items]
+# Convert to dictionaries, preserving sorted rank position
+silver_records = []
+for rank_pos, item in enumerate(ranked_items, 1):
+    record = item.to_dict()
+    record["rank"] = rank_pos
+    silver_records.append(record)
 
 # Add transformation metadata
 transform_time = datetime.now(timezone.utc).isoformat()

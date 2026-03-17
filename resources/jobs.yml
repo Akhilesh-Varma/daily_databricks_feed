@@ -1,6 +1,24 @@
 # Workflow definition for Daily Databricks News Podcast
+#
+# Two parallel branches run after bronze_ingestion:
+#
+#   ANALYTICS BRANCH  — dlt_refresh
+#     Reads bronze_raw_landing via Structured Streaming and produces versioned
+#     Unity Catalog tables (bronze_news, silver_news, gold_top_stories,
+#     gold_daily_summary) for observability, dashboards, and historical queries.
+#
+#   PRODUCTION BRANCH — silver_transformation → gold_aggregation → … → publish_podcast
+#     Reads from JSON files written by the ingestion notebook and drives the
+#     actual podcast episode. Delta tables are written with an _nb suffix.
+#
+# Both branches depend on bronze_ingestion completing first and run in parallel
+# because they are independent — the analytics DLT tables are NOT consumed by
+# the podcast production chain.
+#
 # Secrets are injected via bundle variables (set by --var flags in deploy.yml)
-# and exposed as environment variables through the serverless environment spec.
+# and read by notebooks through SecretsManager (widget args → os.environ).
+# For enhanced security, store secrets in a Databricks Secret Scope named
+# "daily-podcast" — SecretsManager will automatically fall back to it.
 
 resources:
   jobs:
@@ -23,7 +41,6 @@ resources:
       environments:
         - environment_key: "default"
           spec:
-            client: "2"
             dependencies:
               - ${workspace.root_path}/artifacts/.internal/daily_databricks_feed-0.1.0-py3-none-any.whl
               - requests>=2.31.0

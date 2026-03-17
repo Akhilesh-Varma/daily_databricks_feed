@@ -2,17 +2,28 @@
 # MAGIC %md
 # MAGIC # Bronze Ingestion — PySpark 4.0 Custom Streaming Data Sources
 # MAGIC
-# MAGIC All four news sources (Hacker News, Reddit, YouTube, RSS) are implemented
-# MAGIC as **PySpark 4.0 Custom Data Sources** and read via Structured Streaming
-# MAGIC with an **`availableNow`** trigger.
+# MAGIC All news sources are implemented as **PySpark 4.0 Custom Data Sources** and
+# MAGIC read via Structured Streaming with an **`availableNow`** trigger.
+# MAGIC
+# MAGIC | Source | Auth required | Format name |
+# MAGIC |--------|--------------|-------------|
+# MAGIC | Hacker News (Algolia) | None | `hacker_news_news` |
+# MAGIC | RSS feeds (blogs, Medium, arXiv) | None | `rss_news` |
+# MAGIC | GitHub Releases | Optional `GITHUB_TOKEN` | `github_releases_news` |
+# MAGIC | Databricks Community (Discourse) | None | `discourse_news` |
+# MAGIC | Dev.to articles | None | `devto_news` |
+# MAGIC | PyPI package releases | None | `pypi_releases_news` |
+# MAGIC | Reddit | `REDDIT_CLIENT_ID` + `SECRET` | `reddit_news` |
+# MAGIC | YouTube | `YOUTUBE_API_KEY` | `youtube_news` |
+# MAGIC | Stack Overflow | Optional `STACK_EXCHANGE_API_KEY` | `stackoverflow_news` |
 # MAGIC
 # MAGIC ### How it works
 # MAGIC | Step | What happens |
 # MAGIC |------|-------------|
-# MAGIC | First run | `initialOffset` goes back `days_back` days; all matching articles are fetched |
-# MAGIC | Subsequent runs | Checkpoint stores the previous end-epoch; only content published **since that epoch** is fetched |
-# MAGIC | Write | All records are appended to `bronze_raw_landing` (Delta, Unity Catalog) |
-# MAGIC | JSON export | Records for this run are read back from Delta and merged into `bronze_news_raw.json` for downstream notebooks |
+# MAGIC | First run | `initialOffset` goes back `days_back` days; all matching content is fetched |
+# MAGIC | Subsequent runs | Checkpoint stores the previous end-epoch; only content **since that epoch** is fetched |
+# MAGIC | Write | All records appended to `bronze_raw_landing` (Delta, Unity Catalog) |
+# MAGIC | JSON export | Run's records merged into `bronze_news_raw.json` for downstream notebooks |
 
 # COMMAND ----------
 
@@ -53,8 +64,11 @@ secrets.print_status()
 # COMMAND ----------
 
 # Configuration
-DATA_PATH       = os.environ.get("DATA_PATH", str(project_root / "data"))
-DAYS_BACK       = int(os.environ.get("DAYS_BACK", "1"))
+DATA_PATH = os.environ.get("DATA_PATH", str(project_root / "data"))
+try:
+    DAYS_BACK = int(dbutils.widgets.get("DAYS_BACK"))
+except Exception:
+    DAYS_BACK = int(os.environ.get("DAYS_BACK", "1"))
 CHECKPOINT_PATH = os.environ.get(
     "CHECKPOINT_PATH",
     f"{DATA_PATH}/checkpoints/bronze_ingestion",
@@ -96,18 +110,28 @@ spark = SparkSession.builder.getOrCreate()
 # COMMAND ----------
 
 from daily_databricks_feed.data_sources.pyspark_sources import (
+    DevToDataSource,
+    DiscourseDataSource,
+    GitHubReleasesDataSource,
     HackerNewsDataSource,
+    PyPIDataSource,
     RedditDataSource,
     RSSFeedDataSource,
+    StackOverflowDataSource,
     YouTubeDataSource,
 )
 
 spark.dataSource.register(HackerNewsDataSource)
+spark.dataSource.register(RSSFeedDataSource)
+spark.dataSource.register(GitHubReleasesDataSource)
+spark.dataSource.register(DiscourseDataSource)
+spark.dataSource.register(DevToDataSource)
+spark.dataSource.register(PyPIDataSource)
 spark.dataSource.register(RedditDataSource)
 spark.dataSource.register(YouTubeDataSource)
-spark.dataSource.register(RSSFeedDataSource)
+spark.dataSource.register(StackOverflowDataSource)
 
-logger.info("Registered all four PySpark 4.0 Custom Data Sources")
+logger.info("Registered all 9 PySpark 4.0 Custom Data Sources")
 
 # COMMAND ----------
 
@@ -130,6 +154,78 @@ hn_stream = (
 )
 streams.append(("hacker_news", hn_stream))
 logger.info("Built Hacker News stream")
+
+# ── RSS Feeds (blogs, Medium, arXiv newsletters — no credentials) ─────────────
+rss_stream = (
+    spark.readStream
+         .format("rss_news")
+         .option("days_back",         str(max(DAYS_BACK, 7)))
+         .option("limit",             "100")
+         .option("filter_databricks", "true")
+         .load()
+)
+streams.append(("rss_feeds", rss_stream))
+logger.info("Built RSS stream")
+
+# ── GitHub Releases (works without token; GITHUB_TOKEN gives 5000 req/hr) ────
+github_stream = (
+    spark.readStream
+         .format("github_releases_news")
+         .option("days_back",          str(max(DAYS_BACK, 7)))
+         .option("limit",              "50")
+         .option("include_prereleases","false")
+         .load()
+)
+streams.append(("github_releases", github_stream))
+logger.info("Built GitHub Releases stream")
+
+# ── Databricks Community Forum (public Discourse API — no credentials) ────────
+discourse_stream = (
+    spark.readStream
+         .format("discourse_news")
+         .option("days_back", str(DAYS_BACK))
+         .option("limit",     "50")
+         .load()
+)
+streams.append(("databricks_community", discourse_stream))
+logger.info("Built Databricks Community stream")
+
+# ── Dev.to articles (public Forem API — no credentials) ───────────────────────
+devto_stream = (
+    spark.readStream
+         .format("devto_news")
+         .option("days_back",         str(DAYS_BACK))
+         .option("limit",             "50")
+         .option("filter_databricks", "true")
+         .load()
+)
+streams.append(("devto", devto_stream))
+logger.info("Built Dev.to stream")
+
+# ── PyPI Releases (public JSON API — no credentials) ──────────────────────────
+pypi_stream = (
+    spark.readStream
+         .format("pypi_releases_news")
+         .option("days_back", str(max(DAYS_BACK, 7)))
+         .option("limit",     "50")
+         .load()
+)
+streams.append(("pypi_releases", pypi_stream))
+logger.info("Built PyPI Releases stream")
+
+# ── Stack Overflow (300 req/day free; STACK_EXCHANGE_API_KEY → 10,000/day) ────
+so_stream = (
+    spark.readStream
+         .format("stackoverflow_news")
+         .option("days_back",         str(DAYS_BACK))
+         .option("limit",             "30")
+         .option("min_answers",       "1")
+         .option("min_score",         "2")
+         .option("filter_databricks", "true")
+         .load()
+)
+streams.append(("stackoverflow", so_stream))
+logger.info("Built Stack Overflow stream")
 
 # ── Reddit (requires REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET) ────────────────
 if os.environ.get("REDDIT_CLIENT_ID"):
@@ -161,18 +257,6 @@ if os.environ.get("YOUTUBE_API_KEY"):
     logger.info("Built YouTube stream")
 else:
     logger.warning("YOUTUBE_API_KEY not set — YouTube stream skipped")
-
-# ── RSS Feeds (public feeds — no credentials required; 7-day lookback) ───────
-rss_stream = (
-    spark.readStream
-         .format("rss_news")
-         .option("days_back",         str(max(DAYS_BACK, 7)))
-         .option("limit",             "50")
-         .option("filter_databricks", "true")
-         .load()
-)
-streams.append(("rss_feeds", rss_stream))
-logger.info("Built RSS stream")
 
 # COMMAND ----------
 

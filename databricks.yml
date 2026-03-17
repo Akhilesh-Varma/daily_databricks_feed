@@ -84,13 +84,17 @@ targets:
       user_name: ${workspace.current_user.userName}
 
   staging:
-    mode: development
+    mode: production
     workspace:
       host: https://dbc-438ac3cd-0325.cloud.databricks.com
     variables:
       data_path: "/Workspace/Shared/daily_databricks_feed/staging/data"
     run_as:
       user_name: ${workspace.current_user.userName}
+    resources:
+      pipelines:
+        databricks_news_dlt:
+          development: false
 
   prod:
     mode: production

@@ -389,20 +389,6 @@ class RSSPublisher:
             keywords=keywords or [],
         )
 
-    def load_feed(self, feed_url_or_path: str) -> Optional[PodcastFeed]:
-        """
-        Load existing feed from URL or local path.
-
-        Args:
-            feed_url_or_path: URL or file path to RSS feed
-
-        Returns:
-            PodcastFeed or None if not found
-        """
-        # This is a simplified loader - in production, parse the XML fully
-        logger.info(f"Loading feed from {feed_url_or_path}")
-        return None  # Implement full XML parsing if needed
-
     def save_feed_locally(self, feed_xml: str, filepath: str) -> str:
         """
         Save RSS feed to local file.

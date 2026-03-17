@@ -30,6 +30,7 @@ class RSSFeedSource(BaseDataSource):
 
     # Default RSS feeds for Databricks content
     DEFAULT_FEEDS = [
+        # ── Official Databricks & ecosystem ──────────────────────────────────
         {
             "name": "Databricks Blog",
             "url": "https://www.databricks.com/blog/feed",
@@ -46,18 +47,56 @@ class RSSFeedSource(BaseDataSource):
             "category": "official",
         },
         {
-            "name": "Apache Spark Blog",
+            "name": "Apache Spark News",
             "url": "https://spark.apache.org/news/feed.xml",
             "category": "official",
         },
+        # ── Medium — Databricks & data engineering tags ───────────────────────
         {
-            "name": "Towards Data Science (Medium)",
-            "url": "https://towardsdatascience.com/feed",
+            "name": "Medium — Databricks",
+            "url": "https://medium.com/feed/tag/databricks",
             "category": "community",
         },
         {
+            "name": "Medium — Apache Spark",
+            "url": "https://medium.com/feed/tag/apache-spark",
+            "category": "community",
+        },
+        {
+            "name": "Medium — Delta Lake",
+            "url": "https://medium.com/feed/tag/delta-lake",
+            "category": "community",
+        },
+        {
+            "name": "Medium — Data Engineering",
+            "url": "https://medium.com/feed/tag/data-engineering",
+            "category": "community",
+        },
+        {
+            "name": "Towards Data Science",
+            "url": "https://towardsdatascience.com/feed",
+            "category": "community",
+        },
+        # ── Research — arXiv (Atom feeds parsed by feedparser) ───────────────
+        {
+            "name": "arXiv — Databases & Data Engineering (cs.DB)",
+            "url": "https://export.arxiv.org/rss/cs.DB",
+            "category": "research",
+        },
+        {
+            "name": "arXiv — Distributed & Parallel Computing (cs.DC)",
+            "url": "https://export.arxiv.org/rss/cs.DC",
+            "category": "research",
+        },
+        # ── Newsletters ───────────────────────────────────────────────────────
+        {
             "name": "Data Engineering Weekly",
             "url": "https://www.dataengineeringweekly.com/feed",
+            "category": "newsletter",
+        },
+        {
+            "name": "The Sequence (AI/ML newsletter)",
+            "url": "https://thesequence.substack.com/feed",
             "category": "newsletter",
         },
     ]
@@ -86,6 +125,7 @@ class RSSFeedSource(BaseDataSource):
         self,
         feeds: Optional[List[dict]] = None,
         days_back: int = 7,
+        since_epoch: Optional[int] = None,
         limit: int = 100,
         filter_databricks: bool = True,
     ) -> List[NewsItem]:
@@ -94,7 +134,10 @@ class RSSFeedSource(BaseDataSource):
 
         Args:
             feeds: Optional list of feed configs to override defaults
-            days_back: Number of days to look back
+            days_back: Number of days to look back (used only when since_epoch is None)
+            since_epoch: Unix epoch of the earliest allowed publish time.
+                         When set, takes precedence over days_back so that the
+                         PySpark checkpoint boundary is used exactly.
             limit: Maximum number of items to return
             filter_databricks: Whether to filter for Databricks-related content
 
@@ -106,7 +149,11 @@ class RSSFeedSource(BaseDataSource):
             return []
 
         feeds_to_fetch = feeds or self.feeds
-        cutoff_time = datetime.now(timezone.utc) - timedelta(days=days_back)
+        # since_epoch takes precedence — use checkpoint boundary directly
+        if since_epoch is not None:
+            cutoff_time = datetime.fromtimestamp(since_epoch, tz=timezone.utc)
+        else:
+            cutoff_time = datetime.now(timezone.utc) - timedelta(days=days_back)
         all_items = []
 
         for feed_config in feeds_to_fetch:
@@ -136,13 +183,16 @@ class RSSFeedSource(BaseDataSource):
             reverse=True,
         )
 
-        # Apply Databricks filter if requested
-        # Note: Official Databricks feeds are always relevant
+        # Apply Databricks filter if requested.
+        # Official and newsletter feeds are trusted curators — always include.
+        # Research papers are arXiv-selected — include if any keyword matches.
+        # Community / Medium feeds require a keyword match.
         if filter_databricks:
+            trusted_categories = {"official", "newsletter"}
             filtered = []
             for item in unique_items:
-                # Official feeds are always relevant
-                if item.metadata.get("category") == "official":
+                cat = item.metadata.get("category", "")
+                if cat in trusted_categories:
                     filtered.append(item)
                 elif self.is_databricks_related(f"{item.title} {item.content or ''}"):
                     filtered.append(item)

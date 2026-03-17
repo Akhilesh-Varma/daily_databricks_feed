@@ -99,6 +99,7 @@ class RedditSource(BaseDataSource):
         self,
         subreddits: Optional[List[str]] = None,
         days_back: int = 1,
+        since_epoch: Optional[int] = None,
         min_score: int = 5,
         limit: int = 100,
         filter_databricks: bool = True,
@@ -108,7 +109,10 @@ class RedditSource(BaseDataSource):
 
         Args:
             subreddits: List of subreddit names to fetch from
-            days_back: Number of days to look back
+            days_back: Number of days to look back (used only when since_epoch is None)
+            since_epoch: Unix epoch of the earliest allowed publish time.
+                         When set, takes precedence over days_back so that the
+                         PySpark checkpoint boundary is used exactly.
             min_score: Minimum upvote score threshold
             limit: Maximum number of items to return
             filter_databricks: Whether to filter for Databricks-related content
@@ -121,7 +125,11 @@ class RedditSource(BaseDataSource):
             return []
 
         subreddits = subreddits or self.DEFAULT_SUBREDDITS
-        cutoff_time = datetime.now(timezone.utc) - timedelta(days=days_back)
+        # since_epoch takes precedence — use checkpoint boundary directly
+        if since_epoch is not None:
+            cutoff_time = datetime.fromtimestamp(since_epoch, tz=timezone.utc)
+        else:
+            cutoff_time = datetime.now(timezone.utc) - timedelta(days=days_back)
         all_items = []
 
         for subreddit_name in subreddits:
@@ -258,50 +266,3 @@ class RedditSource(BaseDataSource):
             self.logger.warning(f"Error parsing submission: {e}")
             return None
 
-    def search(
-        self,
-        query: str,
-        subreddit: Optional[str] = None,
-        time_filter: str = "week",
-        sort: str = "relevance",
-        limit: int = 50,
-    ) -> List[NewsItem]:
-        """
-        Search Reddit for posts matching a query.
-
-        Args:
-            query: Search query
-            subreddit: Optional subreddit to search in
-            time_filter: One of: all, day, hour, month, week, year
-            sort: One of: relevance, hot, top, new, comments
-            limit: Maximum results
-
-        Returns:
-            List of NewsItem objects
-        """
-        if not self.is_available():
-            return []
-
-        try:
-            if subreddit:
-                search_results = self.reddit.subreddit(subreddit).search(
-                    query, time_filter=time_filter, sort=sort, limit=limit
-                )
-            else:
-                search_results = self.reddit.subreddit("all").search(
-                    query, time_filter=time_filter, sort=sort, limit=limit
-                )
-
-            items = []
-            cutoff_time = datetime.min.replace(tzinfo=timezone.utc)
-
-            for submission in search_results:
-                item = self._parse_submission(submission, cutoff_time, min_score=0)
-                if item:
-                    items.append(item)
-
-            return items
-
-        except Exception as e:
-            self.logger.error(f"Error searching Reddit: {e}")
-            return []

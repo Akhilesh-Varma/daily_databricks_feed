@@ -51,6 +51,7 @@ class HackerNewsSource(BaseDataSource):
         self,
         query: Optional[str] = None,
         days_back: int = 1,
+        since_epoch: Optional[int] = None,
         min_points: int = 5,
         limit: int = 100,
         filter_databricks: bool = True,
@@ -60,7 +61,10 @@ class HackerNewsSource(BaseDataSource):
 
         Args:
             query: Search query (if None, searches for Databricks keywords)
-            days_back: Number of days to look back
+            days_back: Number of days to look back (used only when since_epoch is None)
+            since_epoch: Unix epoch of the earliest allowed publish time.
+                         When set, takes precedence over days_back so that the
+                         PySpark checkpoint boundary is used exactly.
             min_points: Minimum points/score threshold
             limit: Maximum number of items to return
             filter_databricks: Whether to filter for Databricks-related content
@@ -83,9 +87,12 @@ class HackerNewsSource(BaseDataSource):
             ]
         )
 
-        # Calculate timestamp for date filter
-        cutoff_time = datetime.now(timezone.utc) - timedelta(days=days_back)
-        cutoff_timestamp = int(cutoff_time.timestamp())
+        # since_epoch takes precedence — use checkpoint boundary directly
+        if since_epoch is not None:
+            cutoff_timestamp = since_epoch
+        else:
+            cutoff_time = datetime.now(timezone.utc) - timedelta(days=days_back)
+            cutoff_timestamp = int(cutoff_time.timestamp())
 
         for search_query in search_queries:
             try:
@@ -193,68 +200,3 @@ class HackerNewsSource(BaseDataSource):
 
         return items
 
-    def get_top_stories(self, limit: int = 30) -> List[NewsItem]:
-        """
-        Get current top stories from HN front page.
-
-        Args:
-            limit: Maximum number of stories
-
-        Returns:
-            List of NewsItem objects
-        """
-        # Get top story IDs from official API
-        response = requests.get("https://hacker-news.firebaseio.com/v0/topstories.json", timeout=30)
-        response.raise_for_status()
-        story_ids = response.json()[:limit]
-
-        items = []
-        for story_id in story_ids:
-            try:
-                item = self._get_item(story_id)
-                if item:
-                    items.append(item)
-            except Exception as e:
-                self.logger.warning(f"Error fetching story {story_id}: {e}")
-
-        return self.filter_databricks_content(items)
-
-    @rate_limited
-    def _get_item(self, item_id: int) -> Optional[NewsItem]:
-        """
-        Get a single item by ID from the official HN API.
-
-        Args:
-            item_id: Hacker News item ID
-
-        Returns:
-            NewsItem or None if not found/invalid
-        """
-        url = f"https://hacker-news.firebaseio.com/v0/item/{item_id}.json"
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
-
-        data = response.json()
-        if not data or data.get("type") != "story":
-            return None
-
-        created_at = None
-        if data.get("time"):
-            created_at = datetime.fromtimestamp(data["time"], tz=timezone.utc)
-
-        return NewsItem(
-            id=f"hn_{item_id}",
-            source=self.SOURCE_NAME,
-            title=data.get("title", ""),
-            url=data.get("url", f"https://news.ycombinator.com/item?id={item_id}"),
-            content=data.get("text"),
-            author=data.get("by"),
-            published_at=created_at,
-            score=data.get("score", 0),
-            comments_count=data.get("descendants", 0),
-            tags=self.extract_keywords(f"{data.get('title', '')} {data.get('text', '')}"),
-            metadata={
-                "hn_id": str(item_id),
-                "hn_url": f"https://news.ycombinator.com/item?id={item_id}",
-            },
-        )

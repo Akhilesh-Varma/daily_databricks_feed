@@ -13,10 +13,6 @@ resources:
         - notebook:
             path: ../notebooks/dlt_pipeline.py
 
-      configuration:
-        pipeline.catalog: news_pipeline
-        pipeline.schema:  daily_databricks_feed
-
       serverless: true
       channel: CURRENT
       continuous: false

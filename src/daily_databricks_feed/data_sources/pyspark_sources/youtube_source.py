@@ -12,11 +12,10 @@ Credentials are read from the YOUTUBE_API_KEY environment variable
 
 import logging
 import os
-from datetime import datetime, timezone
 
 from pyspark.sql.datasource import DataSource
 
-from .base_source import BRONZE_SCHEMA, BaseNewsStreamReader, item_to_tuple
+from .base_source import BRONZE_SCHEMA, BaseNewsStreamReader
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +23,12 @@ logger = logging.getLogger(__name__)
 class YouTubeStreamReader(BaseNewsStreamReader):
     _DEFAULT_DAYS_BACK = 7  # YouTube search requires a minimum 7-day window
 
-    def _fetch_rows(self, start_epoch: int, end_epoch: int, days_back: int):
+    def _fetch_items(self, start_epoch: int, end_epoch: int):
+        """Fetch YouTube videos published in [start_epoch, end_epoch).
+
+        Passes start_epoch as publishedAfter so only videos newer than the
+        last checkpoint are requested from the API.
+        """
         from daily_databricks_feed.data_sources.youtube import YouTubeSource
 
         source = YouTubeSource(
@@ -36,18 +40,17 @@ class YouTubeStreamReader(BaseNewsStreamReader):
 
         try:
             items = source.fetch_with_retry(
-                days_back=max(days_back, 7),  # enforce minimum lookback
+                since_epoch=start_epoch,
                 limit=int(self.options.get("limit", "30")),
-                filter_databricks=(self.options.get("filter_databricks", "true").lower() == "true"),
+                filter_databricks=(
+                    self.options.get("filter_databricks", "true").lower() == "true"
+                ),
             )
         except Exception as exc:
             logger.error("YouTube fetch failed: %s", exc)
             return
 
-        now_str = datetime.now(timezone.utc).isoformat()
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        for item in items:
-            yield item_to_tuple(item, now_str, today_str)
+        yield from items
 
 
 class YouTubeDataSource(DataSource):

@@ -29,7 +29,10 @@ if str(project_root / "src") not in sys.path:
 
 # Configuration
 DATA_PATH = os.environ.get("DATA_PATH", str(project_root / "data"))
-MAX_STORIES = int(os.environ.get("MAX_STORIES", "10"))
+try:
+    MAX_STORIES = int(dbutils.widgets.get("MAX_STORIES"))
+except Exception:
+    MAX_STORIES = int(os.environ.get("MAX_STORIES", "10"))
 DIVERSITY_WEIGHT = float(os.environ.get("DIVERSITY_WEIGHT", "0.3"))
 
 logger.info(f"Data path: {DATA_PATH}")

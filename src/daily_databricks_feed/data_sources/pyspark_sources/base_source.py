@@ -8,16 +8,22 @@ Offset model
 Offsets are Unix epoch integers.  The checkpoint stores the end-epoch of the
 last successfully processed window.  On the next `availableNow` run, Spark
 passes that as `start`; `latestOffset()` returns the current time as `end`.
-This gives clean incremental ingestion — each run fetches only content
-published since the previous run.
 
-BRONZE_SCHEMA column order MUST match the tuple order yielded by every
-reader's `_fetch_rows` implementation.
+Each `_fetch_items(start_epoch, end_epoch)` implementation MUST pass `start_epoch`
+directly to the underlying API as the 'published after' timestamp.  This ensures
+the checkpoint boundary is honoured and prevents the same article from appearing
+in more than one micro-batch.
+
+`read()` applies a secondary published_at window filter and deduplicates by item
+ID so that minor API clock skew or pagination overlap cannot cause cross-batch
+duplicates.
+
+BRONZE_SCHEMA column order MUST match the tuple order yielded by item_to_tuple.
 """
 
-import math
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from pyspark.sql.datasource import DataSourceStreamReader, InputPartition
 from pyspark.sql.types import LongType, StringType, StructField, StructType
@@ -64,9 +70,12 @@ class BaseNewsStreamReader(DataSourceStreamReader):
     Common offset / partition logic for all API-backed news stream readers.
 
     Subclasses must implement:
-        _fetch_rows(start_epoch, end_epoch, days_back) -> Iterator[tuple]
+        _fetch_items(start_epoch, end_epoch) -> Iterator[NewsItem]
 
-    Each yielded tuple must follow BRONZE_SCHEMA column ordering exactly.
+    The implementation MUST pass start_epoch as the 'published after' timestamp
+    to the underlying API so that only content newer than the checkpoint is
+    requested.  read() enforces the window boundary and deduplicates by ID as a
+    safety net against API clock skew or pagination overlap.
     """
 
     _DEFAULT_DAYS_BACK: int = 1
@@ -99,14 +108,45 @@ class BaseNewsStreamReader(DataSourceStreamReader):
     def read(self, partition: InputPartition):
         """
         Called per partition (potentially on an executor).
-        Derives `days_back` from the time window, then delegates to `_fetch_rows`.
+
+        Delegates to _fetch_items, then applies two safety filters before
+        yielding BRONZE_SCHEMA-ordered tuples:
+
+        1. Window filter  — drops items whose published_at falls outside
+           [start_epoch, end_epoch).  Items with no timestamp are kept
+           (conservative: never silently discard content).
+        2. ID dedup       — skips any item ID already seen in this batch,
+           preventing duplicates from overlapping API queries.
         """
         assert isinstance(partition, TimeRangePartition)
-        days_back = max(1, math.ceil((partition.end_epoch - partition.start_epoch) / 86_400))
-        yield from self._fetch_rows(partition.start_epoch, partition.end_epoch, days_back)
+        now_str = datetime.now(timezone.utc).isoformat()
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        seen_ids: set = set()
 
-    def _fetch_rows(self, start_epoch: int, end_epoch: int, days_back: int):
-        """Yield BRONZE_SCHEMA-ordered tuples for the given time window."""
+        for item in self._fetch_items(partition.start_epoch, partition.end_epoch):
+            # ── Intra-batch dedup ─────────────────────────────────────────
+            if item.id in seen_ids:
+                continue
+
+            # ── Checkpoint window filter ──────────────────────────────────
+            # Items without published_at pass through (no data to filter on).
+            if item.published_at is not None:
+                ts = item.published_at.timestamp()
+                if ts < partition.start_epoch or ts >= partition.end_epoch:
+                    continue
+
+            seen_ids.add(item.id)
+            yield item_to_tuple(item, now_str, today_str)
+
+    def _fetch_items(self, start_epoch: int, end_epoch: int):
+        """
+        Fetch NewsItem objects for the half-open window [start_epoch, end_epoch).
+
+        MUST pass start_epoch to the underlying API as the minimum publish
+        timestamp (i.e. 'published after') so that only content newer than the
+        previous checkpoint is requested.  end_epoch is provided for APIs that
+        support an upper bound, but at minimum start_epoch must be honoured.
+        """
         raise NotImplementedError
 
 
@@ -116,7 +156,7 @@ class BaseNewsStreamReader(DataSourceStreamReader):
 def item_to_tuple(item, now_str: str, today_str: str) -> tuple:
     """
     Convert a NewsItem to a BRONZE_SCHEMA-ordered tuple.
-    Shared by all four readers so column ordering is guaranteed to be consistent.
+    Called by BaseNewsStreamReader.read() after window filtering and dedup.
     """
     import json
 

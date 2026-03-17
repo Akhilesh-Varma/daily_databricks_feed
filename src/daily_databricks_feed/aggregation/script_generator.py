@@ -290,55 +290,97 @@ class ScriptGenerator:
             },
         )
 
+    # Maps internal source names to listener-friendly labels and podcast treatment
+    SOURCE_LABELS = {
+        "github_releases":     ("Official Release",       "🚀"),
+        "pypi_releases":       ("Package Release",        "📦"),
+        "rss_feed":            ("Official Blog / Article","📰"),
+        "hacker_news":         ("Tech Community Buzz",    "💬"),
+        "reddit":              ("Reddit Community",       "👥"),
+        "stackoverflow":       ("Developer Q&A",          "🔧"),
+        "devto":               ("Dev Tutorial / Article", "✍️"),
+        "databricks_community":("Databricks Community",   "🏢"),
+        "youtube":             ("Video Content",          "🎥"),
+    }
+
+    # Podcast treatment instructions per source type
+    SOURCE_TREATMENT = {
+        "github_releases":      "Read this as a formal release announcement. Mention the version number and 1-2 key highlights from the release notes.",
+        "pypi_releases":        "Frame this as a quick package update note. Mention the version and why practitioners should upgrade.",
+        "rss_feed":             "Summarize the blog post's key insight. Add context on why this matters for data engineers.",
+        "hacker_news":          "Mention that this is trending in the tech community. Add your own take on why it caught people's attention.",
+        "reddit":               "Frame this as what the community is actively discussing. Capture the spirit of the thread.",
+        "stackoverflow":        "Present this as a common pain point developers are hitting. If answered, briefly mention the solution direction.",
+        "devto":                "Introduce this as a practical tutorial or guide. Highlight what skill or pattern listeners will learn.",
+        "databricks_community": "Frame this as a real-world question or discussion from Databricks practitioners in the field.",
+        "youtube":              "Mention this as a video resource worth watching for a deeper dive.",
+    }
+
     def _build_prompt(self, stories: List[Dict[str, Any]], date_str: str, podcast_name: str) -> str:
-        """Build the prompt for script generation."""
+        """Build a source-aware prompt for richer podcast script generation."""
         stories_text = ""
-        for i, story in enumerate(stories[:10], 1):  # Limit to 10 stories
+        for i, story in enumerate(stories[:10], 1):
+            source = story.get("source", "unknown")
+            label, emoji = self.SOURCE_LABELS.get(source, ("News", "📌"))
+            treatment = self.SOURCE_TREATMENT.get(source, "Cover this as a general news item.")
+
             stories_text += f"""
-Story {i}:
+Story {i} [{emoji} {label}]:
 Title: {story.get('title', 'Untitled')}
-Source: {story.get('source', 'Unknown')}
+Source: {source}
 Summary: {story.get('content', story.get('title', ''))[:500]}
+Podcast treatment hint: {treatment}
 ---
 """
+
+        # Identify if there are any official releases today for special framing
+        release_sources = {"github_releases", "pypi_releases"}
+        has_releases = any(s.get("source") in release_sources for s in stories[:10])
+        release_tease = " We also have some fresh software releases to cover." if has_releases else ""
 
         prompt = f"""Write a podcast script for "{podcast_name}" dated {date_str}.
 
 The podcast should be approximately {self.TARGET_WORD_COUNT} words (about 5-6 minutes when read aloud).
 
-Here are today's top stories about Databricks and data engineering:
+Today's content comes from 9 different sources: official Databricks & OSS project blogs,
+GitHub release announcements, PyPI package updates, Hacker News, Reddit, Stack Overflow,
+Dev.to tutorials, the Databricks Community Forum, and YouTube.{release_tease}
+
+Here are today's top stories:
 
 {stories_text}
 
-Please write a complete podcast script with:
+Please write a complete, engaging podcast script with these sections:
 
-1. **INTRO** (2-3 sentences): A warm welcome, mention the date, and tease what's coming up.
+1. **[INTRO]** (3-4 sentences):
+   - Warm welcome and date
+   - Set context: "Today we're covering everything from official announcements to what
+     the community is building and asking about"
+   - Tease 1-2 of the most exciting stories
 
-2. **STORIES** (main content): Cover the top 5-7 most interesting stories. For each story:
-   - Introduce it naturally with a transition
-   - Explain why it matters to data engineers and Databricks users
-   - Keep each story to 2-3 sentences
-   - Make it conversational and engaging
+2. **[STORY N: Title]** for each story (one per story, covering 5-7 stories):
+   - Use the "Podcast treatment hint" to frame each story appropriately
+   - For releases: lead with "Big news — version X of Y just dropped..."
+   - For community content: lead with "The community has been buzzing about..."
+   - For tutorials: lead with "If you want to learn..."
+   - For Q&A/Stack Overflow: lead with "A common question practitioners are hitting is..."
+   - Keep each story to 3-5 sentences — enough to be informative, not exhausting
+   - End each story with a brief "why it matters" or "what to do next" sentence
 
-3. **OUTRO** (2-3 sentences): Thank listeners, remind them to subscribe, and sign off.
+3. **[OUTRO]** (3-4 sentences):
+   - Thank listeners
+   - Remind them of the breadth of sources ("from official release notes to community discussions")
+   - Call to action: subscribe, follow along, check the show notes for links
+   - Warm sign-off
 
 Important guidelines:
-- Use conversational language suitable for audio
-- Include natural transitions between stories
-- Avoid jargon without brief explanations
-- Make it sound like two hosts talking (use "we" and vary between "I")
-- Add personality and enthusiasm
-- Don't just read headlines - provide insight and context
-
-Format the script with clear section markers:
-[INTRO]
-...
-[STORY 1: Title]
-...
-[STORY 2: Title]
-...
-[OUTRO]
-...
+- Conversational, audio-first language — no markdown, no bullet points in the script itself
+- Natural transitions between stories ("Speaking of releases...", "On a more community note...",
+  "Switching gears to the developer side...")
+- Group related stories together where natural (e.g. two releases back-to-back)
+- Add personality: a touch of excitement for big releases, empathy for tricky SO questions
+- Vary sentence length for rhythm — mix short punchy sentences with longer explanations
+- Avoid reading raw URLs; say "check the show notes" instead
 """
         return prompt
 
@@ -428,7 +470,12 @@ def select_top_stories(
     diversity_weight: float = 0.3,
 ) -> List[Dict[str, Any]]:
     """
-    Select top stories for the podcast with source diversity.
+    Select top stories for the podcast with source diversity and category balance.
+
+    Ensures the final episode has a mix of:
+    - Official announcements / releases
+    - Community discussions
+    - Educational / tutorial content
 
     Args:
         items: List of news items (as dicts)
@@ -436,12 +483,17 @@ def select_top_stories(
         diversity_weight: How much to prioritize source diversity (0-1)
 
     Returns:
-        Selected stories
+        Selected stories ordered for good podcast flow
     """
     if not items:
         return []
 
-    # Sort by quality score
+    # Category groupings for diversity balancing
+    RELEASE_SOURCES = {"github_releases", "pypi_releases"}
+    COMMUNITY_SOURCES = {"hacker_news", "reddit", "databricks_community", "stackoverflow"}
+    CONTENT_SOURCES = {"rss_feed", "devto", "youtube"}
+
+    # First pass: sort by quality score
     sorted_items = sorted(items, key=lambda x: x.get("quality_score", 0), reverse=True)
 
     selected = []
@@ -452,17 +504,27 @@ def select_top_stories(
             break
 
         source = item.get("source", "unknown")
-
-        # Calculate diversity penalty
         source_count = source_counts.get(source, 0)
         diversity_penalty = source_count * diversity_weight
-
-        # Adjust effective score
         effective_score = item.get("quality_score", 0) - diversity_penalty
 
-        # Select if effective score is still good or we don't have enough stories
         if effective_score > 0.2 or len(selected) < max_stories // 2:
             selected.append(item)
             source_counts[source] = source_count + 1
 
+    # Second pass: reorder for good podcast flow
+    # Order: releases → official content → community → tutorials/Q&A
+    def _flow_key(item: Dict[str, Any]) -> int:
+        src = item.get("source", "")
+        if src in RELEASE_SOURCES:
+            return 0
+        if src == "rss_feed":
+            return 1
+        if src in COMMUNITY_SOURCES:
+            return 2
+        if src in CONTENT_SOURCES:
+            return 3
+        return 4
+
+    selected.sort(key=_flow_key)
     return selected

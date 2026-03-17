@@ -10,19 +10,23 @@ No credentials required — all configured feeds are public.
 """
 
 import logging
-from datetime import datetime, timezone
 
 from pyspark.sql.datasource import DataSource
 
-from .base_source import BRONZE_SCHEMA, BaseNewsStreamReader, item_to_tuple
+from .base_source import BRONZE_SCHEMA, BaseNewsStreamReader
 
 logger = logging.getLogger(__name__)
 
 
 class RSSStreamReader(BaseNewsStreamReader):
-    _DEFAULT_DAYS_BACK = 7  # RSS feeds benefit from a longer lookback window
+    _DEFAULT_DAYS_BACK = 7  # RSS feeds benefit from a longer initial lookback window
 
-    def _fetch_rows(self, start_epoch: int, end_epoch: int, days_back: int):
+    def _fetch_items(self, start_epoch: int, end_epoch: int):
+        """Fetch RSS articles published in [start_epoch, end_epoch).
+
+        Passes start_epoch as the cutoff so only articles newer than the last
+        checkpoint are requested from each feed.
+        """
         from daily_databricks_feed.data_sources.rss_feeds import RSSFeedSource
 
         source = RSSFeedSource()
@@ -32,18 +36,17 @@ class RSSStreamReader(BaseNewsStreamReader):
 
         try:
             items = source.fetch_with_retry(
-                days_back=max(days_back, 7),  # enforce minimum lookback
+                since_epoch=start_epoch,
                 limit=int(self.options.get("limit", "50")),
-                filter_databricks=(self.options.get("filter_databricks", "true").lower() == "true"),
+                filter_databricks=(
+                    self.options.get("filter_databricks", "true").lower() == "true"
+                ),
             )
         except Exception as exc:
             logger.error("RSS fetch failed: %s", exc)
             return
 
-        now_str = datetime.now(timezone.utc).isoformat()
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        for item in items:
-            yield item_to_tuple(item, now_str, today_str)
+        yield from items
 
 
 class RSSFeedDataSource(DataSource):

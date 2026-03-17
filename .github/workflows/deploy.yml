@@ -26,6 +26,7 @@ on:
 env:
   DATABRICKS_HOST: https://dbc-438ac3cd-0325.cloud.databricks.com
   DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+  SERVICE_PRINCIPAL_NAME: ${{ secrets.SERVICE_PRINCIPAL_NAME }}
   TARGET: ${{ github.event.inputs.target || 'prod' }}
 
 jobs:
