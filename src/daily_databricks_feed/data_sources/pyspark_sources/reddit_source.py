@@ -29,9 +29,7 @@ class RedditStreamReader(BaseNewsStreamReader):
         from daily_databricks_feed.data_sources.reddit import RedditSource
 
         source = RedditSource(
-            client_id=os.environ.get(
-                "REDDIT_CLIENT_ID", self.options.get("client_id", "")
-            ),
+            client_id=os.environ.get("REDDIT_CLIENT_ID", self.options.get("client_id", "")),
             client_secret=os.environ.get(
                 "REDDIT_CLIENT_SECRET", self.options.get("client_secret", "")
             ),
@@ -45,15 +43,13 @@ class RedditStreamReader(BaseNewsStreamReader):
                 days_back=days_back,
                 min_score=int(self.options.get("min_score", "3")),
                 limit=int(self.options.get("limit", "50")),
-                filter_databricks=(
-                    self.options.get("filter_databricks", "true").lower() == "true"
-                ),
+                filter_databricks=(self.options.get("filter_databricks", "true").lower() == "true"),
             )
         except Exception as exc:
             logger.error("Reddit fetch failed: %s", exc)
             return
 
-        now_str   = datetime.now(timezone.utc).isoformat()
+        now_str = datetime.now(timezone.utc).isoformat()
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         for item in items:
             yield item_to_tuple(item, now_str, today_str)

@@ -28,9 +28,7 @@ class YouTubeStreamReader(BaseNewsStreamReader):
         from daily_databricks_feed.data_sources.youtube import YouTubeSource
 
         source = YouTubeSource(
-            api_key=os.environ.get(
-                "YOUTUBE_API_KEY", self.options.get("api_key", "")
-            ),
+            api_key=os.environ.get("YOUTUBE_API_KEY", self.options.get("api_key", "")),
         )
         if not source.is_available():
             logger.warning("YouTube API not configured — skipping")
@@ -40,15 +38,13 @@ class YouTubeStreamReader(BaseNewsStreamReader):
             items = source.fetch_with_retry(
                 days_back=max(days_back, 7),  # enforce minimum lookback
                 limit=int(self.options.get("limit", "30")),
-                filter_databricks=(
-                    self.options.get("filter_databricks", "true").lower() == "true"
-                ),
+                filter_databricks=(self.options.get("filter_databricks", "true").lower() == "true"),
             )
         except Exception as exc:
             logger.error("YouTube fetch failed: %s", exc)
             return
 
-        now_str   = datetime.now(timezone.utc).isoformat()
+        now_str = datetime.now(timezone.utc).isoformat()
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         for item in items:
             yield item_to_tuple(item, now_str, today_str)

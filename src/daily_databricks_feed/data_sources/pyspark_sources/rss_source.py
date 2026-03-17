@@ -34,15 +34,13 @@ class RSSStreamReader(BaseNewsStreamReader):
             items = source.fetch_with_retry(
                 days_back=max(days_back, 7),  # enforce minimum lookback
                 limit=int(self.options.get("limit", "50")),
-                filter_databricks=(
-                    self.options.get("filter_databricks", "true").lower() == "true"
-                ),
+                filter_databricks=(self.options.get("filter_databricks", "true").lower() == "true"),
             )
         except Exception as exc:
             logger.error("RSS fetch failed: %s", exc)
             return
 
-        now_str   = datetime.now(timezone.utc).isoformat()
+        now_str = datetime.now(timezone.utc).isoformat()
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         for item in items:
             yield item_to_tuple(item, now_str, today_str)

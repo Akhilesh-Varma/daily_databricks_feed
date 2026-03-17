@@ -27,19 +27,19 @@ from pyspark.sql.types import LongType, StringType, StructField, StructType
 # ---------------------------------------------------------------------------
 BRONZE_SCHEMA = StructType(
     [
-        StructField("id",              StringType(), nullable=False),
-        StructField("source",          StringType(), nullable=False),
-        StructField("title",           StringType(), nullable=False),
-        StructField("url",             StringType(), nullable=False),
-        StructField("content",         StringType(), nullable=True),
-        StructField("author",          StringType(), nullable=True),
-        StructField("published_at",    StringType(), nullable=True),
-        StructField("fetched_at",      StringType(), nullable=False),
-        StructField("score",           LongType(),   nullable=True),
-        StructField("comments_count",  LongType(),   nullable=True),
-        StructField("tags",            StringType(), nullable=True),   # JSON array
-        StructField("metadata",        StringType(), nullable=True),   # JSON object
-        StructField("_ingested_at",    StringType(), nullable=False),
+        StructField("id", StringType(), nullable=False),
+        StructField("source", StringType(), nullable=False),
+        StructField("title", StringType(), nullable=False),
+        StructField("url", StringType(), nullable=False),
+        StructField("content", StringType(), nullable=True),
+        StructField("author", StringType(), nullable=True),
+        StructField("published_at", StringType(), nullable=True),
+        StructField("fetched_at", StringType(), nullable=False),
+        StructField("score", LongType(), nullable=True),
+        StructField("comments_count", LongType(), nullable=True),
+        StructField("tags", StringType(), nullable=True),  # JSON array
+        StructField("metadata", StringType(), nullable=True),  # JSON object
+        StructField("_ingested_at", StringType(), nullable=False),
         StructField("_ingestion_date", StringType(), nullable=False),
     ]
 )
@@ -53,7 +53,7 @@ class TimeRangePartition(InputPartition):
     """Half-open time window [start_epoch, end_epoch) for a single API fetch."""
 
     start_epoch: int
-    end_epoch:   int
+    end_epoch: int
 
 
 # ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@ class BaseNewsStreamReader(DataSourceStreamReader):
     _DEFAULT_DAYS_BACK: int = 1
 
     def __init__(self, options: dict) -> None:
-        self.options  = options
+        self.options = options
         self._days_back = int(options.get("days_back", self._DEFAULT_DAYS_BACK))
 
     # ── Offset contract ──────────────────────────────────────────────────────
@@ -102,9 +102,7 @@ class BaseNewsStreamReader(DataSourceStreamReader):
         Derives `days_back` from the time window, then delegates to `_fetch_rows`.
         """
         assert isinstance(partition, TimeRangePartition)
-        days_back = max(1, math.ceil(
-            (partition.end_epoch - partition.start_epoch) / 86_400
-        ))
+        days_back = max(1, math.ceil((partition.end_epoch - partition.start_epoch) / 86_400))
         yield from self._fetch_rows(partition.start_epoch, partition.end_epoch, days_back)
 
     def _fetch_rows(self, start_epoch: int, end_epoch: int, days_back: int):
@@ -124,17 +122,17 @@ def item_to_tuple(item, now_str: str, today_str: str) -> tuple:
 
     d = item.to_dict()
     return (
-        str(d.get("id",             "")),
-        str(d.get("source",         "")),
-        str(d.get("title",          "")),
-        str(d.get("url",            "")),
+        str(d.get("id", "")),
+        str(d.get("source", "")),
+        str(d.get("title", "")),
+        str(d.get("url", "")),
         d.get("content"),
         d.get("author"),
         str(d["published_at"]) if d.get("published_at") else None,
         str(d.get("fetched_at") or now_str),
-        int(d.get("score",          0) or 0),
+        int(d.get("score", 0) or 0),
         int(d.get("comments_count", 0) or 0),
-        json.dumps(d.get("tags",     [])),
+        json.dumps(d.get("tags", [])),
         json.dumps(d.get("metadata", {})),
         now_str,
         today_str,
