@@ -166,6 +166,86 @@ logger.info(f"Saved today's stories to {gold_stories_file}")
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## Write to Delta Tables (Gold)
+
+# COMMAND ----------
+
+import uuid
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+
+def _get_run_id():
+    try:
+        return dbutils.notebook.entry_point.getDbutils().notebook().getContext().tags().apply("jobRunId")
+    except Exception:
+        return f"local-{uuid.uuid4().hex[:8]}"
+
+_run_id = _get_run_id()
+_pipeline_run_at = datetime.now(timezone.utc).isoformat()
+
+spark.sql("CREATE SCHEMA IF NOT EXISTS news_pipeline.daily_databricks_feed")
+
+# Write top stories
+if top_stories:
+    import pandas as pd
+
+    stories_rows = []
+    for rank_idx, story in enumerate(top_stories, 1):
+        stories_rows.append({
+            "episode_date":     date_str,
+            "rank":             rank_idx,
+            "id":               str(story.get("id", "")),
+            "source":           str(story.get("source", "")),
+            "title":            str(story.get("title_cleaned") or story.get("title", "")),
+            "content":          story.get("content_cleaned") or story.get("content"),
+            "url":              str(story.get("url", "")),
+            "score":            int(story.get("score", 0) or 0),
+            "comments_count":   int(story.get("comments_count", 0) or 0),
+            "quality_score":    float(story.get("quality_score", 0.0) or 0.0),
+            "keywords":         json.dumps(story.get("keywords", [])),
+            "_run_id":          _run_id,
+            "_pipeline_run_at": _pipeline_run_at,
+            "_aggregated_at":   datetime.now(timezone.utc).isoformat(),
+        })
+
+    df_stories = spark.createDataFrame(pd.DataFrame(stories_rows))
+    (
+        df_stories.write
+                  .format("delta")
+                  .mode("append")
+                  .option("mergeSchema", "true")
+                  .saveAsTable("news_pipeline.daily_databricks_feed.gold_top_stories_nb")
+    )
+    logger.info(f"Wrote {len(stories_rows)} top stories to Delta gold_top_stories_nb (run_id={_run_id})")
+
+# Write daily summary
+summary_row = {
+    "episode_date":        date_str,
+    "story_count":         len(top_stories),
+    "unique_source_count": len(source_counts),
+    "source_distribution": json.dumps(source_counts),
+    "total_candidates":    len(silver_records),
+    "max_stories_param":   MAX_STORIES,
+    "diversity_weight":    DIVERSITY_WEIGHT,
+    "_run_id":             _run_id,
+    "_pipeline_run_at":    _pipeline_run_at,
+    "_aggregated_at":      datetime.now(timezone.utc).isoformat(),
+}
+
+df_summary = spark.createDataFrame([summary_row])
+(
+    df_summary.write
+              .format("delta")
+              .mode("append")
+              .option("mergeSchema", "true")
+              .saveAsTable("news_pipeline.daily_databricks_feed.gold_daily_summary_nb")
+)
+logger.info(f"Wrote daily summary to Delta gold_daily_summary_nb (run_id={_run_id})")
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## Generate Story Summaries for Script
 
 # COMMAND ----------

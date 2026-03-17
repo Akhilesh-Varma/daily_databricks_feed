@@ -337,6 +337,53 @@ else:
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## Write to Delta Table (Feed History)
+
+# COMMAND ----------
+
+import uuid
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+
+def _get_run_id():
+    try:
+        return dbutils.notebook.entry_point.getDbutils().notebook().getContext().tags().apply("jobRunId")
+    except Exception:
+        return f"local-{uuid.uuid4().hex[:8]}"
+
+_run_id = _get_run_id()
+
+spark.sql("CREATE SCHEMA IF NOT EXISTS news_pipeline.daily_databricks_feed")
+
+feed_row = {
+    "episode_date":           date_str,
+    "episode_guid":           episode.guid,
+    "episode_title":          episode.title,
+    "episode_number":         episode.episode_number,
+    "audio_url":              audio_url,
+    "duration_seconds":       episode.duration_seconds,
+    "feed_url":               feed_url,
+    "total_episodes_in_feed": len(feed.episodes),
+    "feed_xml_length":        len(rss_xml),
+    "gcs_uploaded":           bool(GCS_BUCKET and not DRY_RUN),
+    "_run_id":                _run_id,
+    "_pipeline_run_at":       datetime.now(timezone.utc).isoformat(),
+}
+
+df_feed = spark.createDataFrame([feed_row])
+(
+    df_feed.write
+           .format("delta")
+           .mode("append")
+           .option("mergeSchema", "true")
+           .saveAsTable("news_pipeline.daily_databricks_feed.podcast_feed_history")
+)
+logger.info(f"Wrote feed history to Delta podcast_feed_history (run_id={_run_id})")
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## Summary
 
 # COMMAND ----------

@@ -6,7 +6,7 @@ from .reddit import RedditSource
 from .youtube import YouTubeSource
 from .rss_feeds import RSSFeedSource
 
-# PySpark Data Source API implementations (requires PySpark 4.0+)
+# PySpark 4.0 Custom Data Source API implementations
 try:
     from .pyspark_sources import (
         HackerNewsDataSource,
@@ -14,7 +14,6 @@ try:
         YouTubeDataSource,
         RSSFeedDataSource,
     )
-
     PYSPARK_SOURCES_AVAILABLE = True
 except ImportError:
     PYSPARK_SOURCES_AVAILABLE = False
@@ -24,13 +23,11 @@ except ImportError:
     RSSFeedDataSource = None
 
 __all__ = [
-    # Standard Python implementations
     "BaseDataSource",
     "HackerNewsSource",
     "RedditSource",
     "YouTubeSource",
     "RSSFeedSource",
-    # PySpark Data Source API implementations
     "HackerNewsDataSource",
     "RedditDataSource",
     "YouTubeDataSource",

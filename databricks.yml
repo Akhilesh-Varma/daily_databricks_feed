@@ -13,7 +13,7 @@ variables:
 
   volume_path:
     description: "Unity Catalog volume path for artifacts"
-    default: "/Volumes/main/default/podcast_data"
+    default: "/Volumes/news_pipeline/default/podcast_data"
 
   # ── Podcast metadata ─────────────────────────────────────────────────────────
   podcast_title:
@@ -98,7 +98,7 @@ targets:
       host: https://dbc-438ac3cd-0325.cloud.databricks.com
       root_path: /Workspace/Shared/daily_databricks_feed/prod
     variables:
-      data_path: "/Volumes/main/default/podcast_data"
+      data_path: "/Volumes/news_pipeline/default/podcast_data"
     run_as:
       service_principal_name: ${SERVICE_PRINCIPAL_NAME}
     permissions:
@@ -106,6 +106,10 @@ targets:
         group_name: users
       - level: CAN_MANAGE
         group_name: admins
+    resources:
+      pipelines:
+        databricks_news_dlt:
+          development: false
 
   local:
     mode: development

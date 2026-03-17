@@ -45,6 +45,14 @@ resources:
               YOUTUBE_API_KEY: "${var.youtube_api_key}"
           environment_key: "default"
 
+        - task_key: dlt_refresh
+          description: "Refresh DLT pipeline (Bronze→Silver→Gold in Unity Catalog)"
+          depends_on:
+            - task_key: bronze_ingestion
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.databricks_news_dlt.id}
+            full_refresh: false
+
         - task_key: silver_transformation
           description: "Clean, deduplicate, and extract keywords"
           depends_on:

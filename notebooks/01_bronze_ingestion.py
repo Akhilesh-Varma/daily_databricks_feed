@@ -1,14 +1,18 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Bronze Ingestion - Fetch News from All Sources
+# MAGIC # Bronze Ingestion — PySpark 4.0 Custom Streaming Data Sources
 # MAGIC
-# MAGIC This notebook fetches news from multiple sources:
-# MAGIC - Hacker News (Algolia API)
-# MAGIC - Reddit (PRAW)
-# MAGIC - YouTube (Data API v3)
-# MAGIC - RSS Feeds (feedparser)
+# MAGIC All four news sources (Hacker News, Reddit, YouTube, RSS) are implemented
+# MAGIC as **PySpark 4.0 Custom Data Sources** and read via Structured Streaming
+# MAGIC with an **`availableNow`** trigger.
 # MAGIC
-# MAGIC Data is saved to the bronze layer as raw records.
+# MAGIC ### How it works
+# MAGIC | Step | What happens |
+# MAGIC |------|-------------|
+# MAGIC | First run | `initialOffset` goes back `days_back` days; all matching articles are fetched |
+# MAGIC | Subsequent runs | Checkpoint stores the previous end-epoch; only content published **since that epoch** is fetched |
+# MAGIC | Write | All records are appended to `bronze_raw_landing` (Delta, Unity Catalog) |
+# MAGIC | JSON export | Records for this run are read back from Delta and merged into `bronze_news_raw.json` for downstream notebooks |
 
 # COMMAND ----------
 
@@ -16,203 +20,253 @@
 
 # COMMAND ----------
 
-import os
-import sys
 import json
 import logging
+import os
+import sys
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Setup logging
+import pyspark.sql.functions as F
+from pyspark.sql import SparkSession
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Add src to path for local development
 project_root = Path(os.getcwd()).parent
 if str(project_root / "src") not in sys.path:
     sys.path.insert(0, str(project_root / "src"))
 
 # COMMAND ----------
 
-# Load environment variables from .env file if running locally
-from daily_databricks_feed.utils.secrets import load_dotenv, SecretsManager
+from daily_databricks_feed.utils.secrets import SecretsManager, load_dotenv
 
 env_file = project_root / ".env"
 if env_file.exists():
     load_dotenv(str(env_file))
     logger.info("Loaded environment from .env file")
 
-# Initialize secrets manager
 secrets = SecretsManager()
 secrets.print_status()
 
 # COMMAND ----------
 
 # Configuration
-DATA_PATH = os.environ.get("DATA_PATH", str(project_root / "data"))
-DAYS_BACK = int(os.environ.get("DAYS_BACK", "1"))
+DATA_PATH       = os.environ.get("DATA_PATH", str(project_root / "data"))
+DAYS_BACK       = int(os.environ.get("DAYS_BACK", "1"))
+CHECKPOINT_PATH = os.environ.get(
+    "CHECKPOINT_PATH",
+    f"{DATA_PATH}/checkpoints/bronze_ingestion",
+)
 
-logger.info(f"Data path: {DATA_PATH}")
-logger.info(f"Fetching news from the last {DAYS_BACK} days")
+logger.info("Data path:       %s", DATA_PATH)
+logger.info("Days back:       %d", DAYS_BACK)
+logger.info("Checkpoint path: %s", CHECKPOINT_PATH)
 
-# Create data directory if it doesn't exist
 Path(DATA_PATH).mkdir(parents=True, exist_ok=True)
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Fetch from Hacker News
+# Run tracking — same ID across all tasks in one Databricks job run
+def _get_run_id() -> str:
+    try:
+        return (
+            dbutils.notebook.entry_point
+                   .getDbutils().notebook().getContext()
+                   .tags().apply("jobRunId")
+        )
+    except Exception:
+        return f"local-{uuid.uuid4().hex[:8]}"
+
+_run_id          = _get_run_id()
+_pipeline_run_at = datetime.now(timezone.utc).isoformat()
+
+logger.info("Run ID: %s", _run_id)
 
 # COMMAND ----------
 
-from daily_databricks_feed.data_sources.hacker_news import HackerNewsSource
+spark = SparkSession.builder.getOrCreate()
 
-hn_source = HackerNewsSource()
+# COMMAND ----------
 
-try:
-    hn_items = hn_source.fetch_with_retry(
-        days_back=DAYS_BACK,
-        min_points=5,
-        limit=50,
-        filter_databricks=True,
+# MAGIC %md
+# MAGIC ## Register PySpark 4.0 Custom Data Sources
+
+# COMMAND ----------
+
+from daily_databricks_feed.data_sources.pyspark_sources import (
+    HackerNewsDataSource,
+    RedditDataSource,
+    RSSFeedDataSource,
+    YouTubeDataSource,
+)
+
+spark.dataSource.register(HackerNewsDataSource)
+spark.dataSource.register(RedditDataSource)
+spark.dataSource.register(YouTubeDataSource)
+spark.dataSource.register(RSSFeedDataSource)
+
+logger.info("Registered all four PySpark 4.0 Custom Data Sources")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Build Streaming Sources
+
+# COMMAND ----------
+
+streams = []  # list of (source_name, streaming_DataFrame)
+
+# ── Hacker News (public API — no credentials required) ───────────────────────
+hn_stream = (
+    spark.readStream
+         .format("hacker_news_news")
+         .option("days_back",         str(DAYS_BACK))
+         .option("min_points",        "5")
+         .option("limit",             "50")
+         .option("filter_databricks", "true")
+         .load()
+)
+streams.append(("hacker_news", hn_stream))
+logger.info("Built Hacker News stream")
+
+# ── Reddit (requires REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET) ────────────────
+if os.environ.get("REDDIT_CLIENT_ID"):
+    reddit_stream = (
+        spark.readStream
+             .format("reddit_news")
+             .option("days_back",         str(DAYS_BACK))
+             .option("min_score",         "3")
+             .option("limit",             "50")
+             .option("filter_databricks", "true")
+             .load()
     )
-    logger.info(f"Fetched {len(hn_items)} items from Hacker News")
-except Exception as e:
-    logger.error(f"Error fetching from Hacker News: {e}")
-    hn_items = []
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Fetch from Reddit
-
-# COMMAND ----------
-
-from daily_databricks_feed.data_sources.reddit import RedditSource
-
-reddit_source = RedditSource()
-
-if reddit_source.is_available():
-    try:
-        reddit_items = reddit_source.fetch_with_retry(
-            days_back=DAYS_BACK,
-            min_score=3,
-            limit=50,
-            filter_databricks=True,
-        )
-        logger.info(f"Fetched {len(reddit_items)} items from Reddit")
-    except Exception as e:
-        logger.error(f"Error fetching from Reddit: {e}")
-        reddit_items = []
+    streams.append(("reddit", reddit_stream))
+    logger.info("Built Reddit stream")
 else:
-    logger.warning("Reddit API not configured, skipping")
-    reddit_items = []
+    logger.warning("REDDIT_CLIENT_ID not set — Reddit stream skipped")
 
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Fetch from YouTube
-
-# COMMAND ----------
-
-from daily_databricks_feed.data_sources.youtube import YouTubeSource
-
-youtube_source = YouTubeSource()
-
-if youtube_source.is_available():
-    try:
-        youtube_items = youtube_source.fetch_with_retry(
-            days_back=max(DAYS_BACK, 7),  # YouTube needs longer lookback
-            limit=30,
-            filter_databricks=True,
-        )
-        logger.info(f"Fetched {len(youtube_items)} items from YouTube")
-    except Exception as e:
-        logger.error(f"Error fetching from YouTube: {e}")
-        youtube_items = []
+# ── YouTube (requires YOUTUBE_API_KEY; minimum 7-day lookback) ───────────────
+if os.environ.get("YOUTUBE_API_KEY"):
+    youtube_stream = (
+        spark.readStream
+             .format("youtube_news")
+             .option("days_back",         str(max(DAYS_BACK, 7)))
+             .option("limit",             "30")
+             .option("filter_databricks", "true")
+             .load()
+    )
+    streams.append(("youtube", youtube_stream))
+    logger.info("Built YouTube stream")
 else:
-    logger.warning("YouTube API not configured, skipping")
-    youtube_items = []
+    logger.warning("YOUTUBE_API_KEY not set — YouTube stream skipped")
+
+# ── RSS Feeds (public feeds — no credentials required; 7-day lookback) ───────
+rss_stream = (
+    spark.readStream
+         .format("rss_news")
+         .option("days_back",         str(max(DAYS_BACK, 7)))
+         .option("limit",             "50")
+         .option("filter_databricks", "true")
+         .load()
+)
+streams.append(("rss_feeds", rss_stream))
+logger.info("Built RSS stream")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Fetch from RSS Feeds
+# MAGIC ## Union All Sources and Attach Run Metadata
 
 # COMMAND ----------
 
-from daily_databricks_feed.data_sources.rss_feeds import RSSFeedSource
+# Union all active streams (all share BRONZE_SCHEMA — safe to union directly)
+unified = streams[0][1]
+for _, s in streams[1:]:
+    unified = unified.union(s)
 
-rss_source = RSSFeedSource()
+# Attach run-level columns as literals so every row is traceable to this run
+all_stream = (
+    unified
+    .withColumn("_run_id",          F.lit(_run_id))
+    .withColumn("_pipeline_run_at", F.lit(_pipeline_run_at))
+)
 
-if rss_source.is_available():
-    try:
-        rss_items = rss_source.fetch_with_retry(
-            days_back=max(DAYS_BACK, 7),
-            limit=50,
-            filter_databricks=True,
-        )
-        logger.info(f"Fetched {len(rss_items)} items from RSS feeds")
-    except Exception as e:
-        logger.error(f"Error fetching from RSS feeds: {e}")
-        rss_items = []
-else:
-    logger.warning("RSS parsing not available, skipping")
-    rss_items = []
+logger.info(
+    "Unified %d stream(s): %s",
+    len(streams),
+    [name for name, _ in streams],
+)
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Combine and Save to Bronze Layer
+# MAGIC ## Write to Delta — `availableNow` Trigger
 
 # COMMAND ----------
 
-# Combine all items
-all_items = hn_items + reddit_items + youtube_items + rss_items
+spark.sql("CREATE SCHEMA IF NOT EXISTS news_pipeline.daily_databricks_feed")
 
-logger.info(f"Total items fetched: {len(all_items)}")
-logger.info(f"  - Hacker News: {len(hn_items)}")
-logger.info(f"  - Reddit: {len(reddit_items)}")
-logger.info(f"  - YouTube: {len(youtube_items)}")
-logger.info(f"  - RSS Feeds: {len(rss_items)}")
+query = (
+    all_stream
+    .writeStream
+    .format("delta")
+    .outputMode("append")
+    .option("checkpointLocation", CHECKPOINT_PATH)
+    .option("mergeSchema",        "true")
+    .trigger(availableNow=True)          # process all available data, then stop
+    .toTable("news_pipeline.daily_databricks_feed.bronze_raw_landing")
+)
 
-# COMMAND ----------
-
-# Convert to dictionaries for storage
-bronze_records = [item.to_dict() for item in all_items]
-
-# Add ingestion metadata
-ingestion_time = datetime.now(timezone.utc).isoformat()
-for record in bronze_records:
-    record["_ingested_at"] = ingestion_time
-    record["_ingestion_date"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+logger.info("Streaming ingestion started (availableNow) ...")
+query.awaitTermination()
+logger.info("Streaming ingestion complete")
 
 # COMMAND ----------
 
-# Save to JSON for simplicity (can use Delta Lake with Spark if available)
+# MAGIC %md
+# MAGIC ## Export to JSON for Downstream Notebooks
+
+# COMMAND ----------
+
+# Read what was written in this run and save to JSON.
+# Notebooks 02–06 still read from bronze_news_raw.json, so we keep that file
+# up-to-date as a snapshot that accumulates new records across runs.
+
+run_df = (
+    spark.table("news_pipeline.daily_databricks_feed.bronze_raw_landing")
+         .filter(F.col("_run_id") == _run_id)
+)
+
+new_records_count = run_df.count()
+logger.info("Records written this run: %d", new_records_count)
+
+bronze_records = run_df.toPandas().to_dict(orient="records")
+
 bronze_file = Path(DATA_PATH) / "bronze_news_raw.json"
 
-# Load existing data if any
-existing_records = []
+existing_records: list = []
 if bronze_file.exists():
     try:
         with open(bronze_file, "r") as f:
             existing_records = json.load(f)
-    except Exception as e:
-        logger.warning(f"Error loading existing bronze data: {e}")
+    except Exception as exc:
+        logger.warning("Could not load existing JSON: %s", exc)
 
-# Deduplicate by ID
 existing_ids = {r["id"] for r in existing_records}
-new_records = [r for r in bronze_records if r["id"] not in existing_ids]
-
-# Combine and save
-all_records = existing_records + new_records
+new_for_json = [r for r in bronze_records if r["id"] not in existing_ids]
+all_records  = existing_records + new_for_json
 
 with open(bronze_file, "w") as f:
     json.dump(all_records, f, indent=2, default=str)
 
-logger.info(f"Saved {len(new_records)} new records to bronze layer")
-logger.info(f"Total records in bronze: {len(all_records)}")
+logger.info(
+    "JSON snapshot: %d new / %d total → %s",
+    len(new_for_json),
+    len(all_records),
+    bronze_file,
+)
 
 # COMMAND ----------
 
@@ -221,24 +275,27 @@ logger.info(f"Total records in bronze: {len(all_records)}")
 
 # COMMAND ----------
 
-# Print summary
+source_counts: dict = {}
+for r in bronze_records:
+    src = r.get("source", "unknown")
+    source_counts[src] = source_counts.get(src, 0) + 1
+
 print("\n" + "=" * 60)
 print("BRONZE INGESTION COMPLETE")
 print("=" * 60)
-print(f"Date: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
-print(f"New records: {len(new_records)}")
-print(f"Total records: {len(all_records)}")
-print(f"Output file: {bronze_file}")
+print(f"Run ID:          {_run_id}")
+print(f"Date:            {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+print(f"New records:     {new_records_count}")
+print(f"Total in JSON:   {len(all_records)}")
+print(f"Active streams:  {[name for name, _ in streams]}")
+print("\nSource breakdown:")
+for source, count in sorted(source_counts.items(), key=lambda x: x[1], reverse=True):
+    print(f"  {source}: {count}")
 print("=" * 60)
 
-# Return count for workflow
 dbutils.notebook.exit(json.dumps({
-    "new_records": len(new_records),
+    "run_id":        _run_id,
+    "new_records":   new_records_count,
     "total_records": len(all_records),
-    "sources": {
-        "hacker_news": len(hn_items),
-        "reddit": len(reddit_items),
-        "youtube": len(youtube_items),
-        "rss_feeds": len(rss_items),
-    }
+    "sources":       source_counts,
 })) if "dbutils" in dir() else None

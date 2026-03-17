@@ -228,6 +228,55 @@ logger.info(f"Updated gold scripts at {gold_scripts_file}")
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## Write to Delta Table (Scripts)
+
+# COMMAND ----------
+
+import uuid
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+
+def _get_run_id():
+    try:
+        return dbutils.notebook.entry_point.getDbutils().notebook().getContext().tags().apply("jobRunId")
+    except Exception:
+        return f"local-{uuid.uuid4().hex[:8]}"
+
+_run_id = _get_run_id()
+
+spark.sql("CREATE SCHEMA IF NOT EXISTS news_pipeline.daily_databricks_feed")
+
+script_dict = script.to_dict()
+
+script_row = {
+    "episode_date":        date_str,
+    "title":               script_dict.get("title", ""),
+    "word_count":          int(script_dict.get("word_count", 0) or 0),
+    "duration_seconds":    int(script_dict.get("estimated_duration_seconds", 0) or 0),
+    "intro":               script_dict.get("intro", ""),
+    "outro":               script_dict.get("outro", ""),
+    "stories_json":        json.dumps(script_dict.get("stories", [])),
+    "story_count":         len(script_dict.get("stories", [])),
+    "ssml_length":         len(ssml_script),
+    "provider":            script_dict.get("metadata", {}).get("provider", "unknown"),
+    "_run_id":             _run_id,
+    "_pipeline_run_at":    datetime.now(timezone.utc).isoformat(),
+}
+
+df_script = spark.createDataFrame([script_row])
+(
+    df_script.write
+             .format("delta")
+             .mode("append")
+             .option("mergeSchema", "true")
+             .saveAsTable("news_pipeline.daily_databricks_feed.podcast_scripts")
+)
+logger.info(f"Wrote script metadata to Delta podcast_scripts (run_id={_run_id})")
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## Summary
 
 # COMMAND ----------

@@ -198,6 +198,69 @@ logger.info(f"Saved {len(silver_records)} records to silver layer")
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## Write to Delta Table (Silver)
+
+# COMMAND ----------
+
+import uuid
+from pyspark.sql import SparkSession
+import pyspark.sql.functions as F
+
+spark = SparkSession.builder.getOrCreate()
+
+def _get_run_id():
+    try:
+        return dbutils.notebook.entry_point.getDbutils().notebook().getContext().tags().apply("jobRunId")
+    except Exception:
+        return f"local-{uuid.uuid4().hex[:8]}"
+
+_run_id = _get_run_id()
+_pipeline_run_at = datetime.now(timezone.utc).isoformat()
+
+spark.sql("CREATE SCHEMA IF NOT EXISTS news_pipeline.daily_databricks_feed")
+
+if silver_records:
+    import pandas as pd
+
+    delta_rows = []
+    for r in silver_records:
+        delta_rows.append({
+            "id":               str(r.get("id", "")),
+            "source":           str(r.get("source", "")),
+            "title":            str(r.get("title", "")),
+            "title_cleaned":    str(r.get("title_cleaned", "")),
+            "url":              str(r.get("url", "")),
+            "content":          r.get("content"),
+            "content_cleaned":  r.get("content_cleaned"),
+            "author":           r.get("author"),
+            "published_at":     str(r.get("published_at", "")) if r.get("published_at") else None,
+            "score":            int(r.get("score", 0) or 0),
+            "comments_count":   int(r.get("comments_count", 0) or 0),
+            "keywords":         json.dumps(r.get("keywords", [])),
+            "quality_score":    float(r.get("quality_score", 0.0) or 0.0),
+            "is_duplicate":     bool(r.get("is_duplicate", False)),
+            "rank":             int(r.get("rank", 0) or 0),
+            "_ingestion_date":  str(r.get("_ingestion_date", "")),
+            "_transformed_at":  str(r.get("_transformed_at", "")),
+            "_run_id":          _run_id,
+            "_pipeline_run_at": _pipeline_run_at,
+        })
+
+    df = spark.createDataFrame(pd.DataFrame(delta_rows))
+
+    (
+        df.write
+          .format("delta")
+          .mode("append")
+          .option("mergeSchema", "true")
+          .saveAsTable("news_pipeline.daily_databricks_feed.silver_news_nb")
+    )
+
+    logger.info(f"Wrote {len(delta_rows)} records to Delta silver_news_nb (run_id={_run_id})")
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## Preview Top Items
 
 # COMMAND ----------

@@ -1,0 +1,29 @@
+# Delta Live Tables pipeline for Databricks News Feed
+# Reads from bronze_raw_landing (written by notebook 01) and produces
+# versioned Bronze / Silver / Gold Delta tables in Unity Catalog.
+
+resources:
+  pipelines:
+    databricks_news_dlt:
+      name: "Databricks News DLT Pipeline [${bundle.target}]"
+      catalog: news_pipeline
+      schema: daily_databricks_feed
+
+      libraries:
+        - notebook:
+            path: ../notebooks/dlt_pipeline.py
+
+      configuration:
+        pipeline.catalog: news_pipeline
+        pipeline.schema:  daily_databricks_feed
+
+      serverless: true
+      channel: CURRENT
+      continuous: false
+
+      development: true
+
+      tags:
+        project: "daily-databricks-podcast"
+        environment: "${bundle.target}"
+        layer: "dlt-bronze-silver-gold"

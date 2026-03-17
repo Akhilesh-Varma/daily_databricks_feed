@@ -213,6 +213,52 @@ logger.info(f"Updated gold episodes at {gold_episodes_file}")
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## Write to Delta Table (Audio Episodes)
+
+# COMMAND ----------
+
+import uuid
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+
+def _get_run_id():
+    try:
+        return dbutils.notebook.entry_point.getDbutils().notebook().getContext().tags().apply("jobRunId")
+    except Exception:
+        return f"local-{uuid.uuid4().hex[:8]}"
+
+_run_id = _get_run_id()
+
+spark.sql("CREATE SCHEMA IF NOT EXISTS news_pipeline.daily_databricks_feed")
+
+episode_row = {
+    "episode_date":     date_str,
+    "title":            podcast_audio.title,
+    "format":           podcast_audio.format,
+    "duration_seconds": podcast_audio.duration_seconds,
+    "file_size_bytes":  podcast_audio.file_size_bytes,
+    "filename":         audio_filename,
+    "filepath":         str(audio_file),
+    "segment_count":    len(podcast_audio.segments),
+    "segments_json":    json.dumps(podcast_audio.segments),
+    "_run_id":          _run_id,
+    "_pipeline_run_at": datetime.now(timezone.utc).isoformat(),
+}
+
+df_episode = spark.createDataFrame([episode_row])
+(
+    df_episode.write
+              .format("delta")
+              .mode("append")
+              .option("mergeSchema", "true")
+              .saveAsTable("news_pipeline.daily_databricks_feed.audio_episodes")
+)
+logger.info(f"Wrote episode metadata to Delta audio_episodes (run_id={_run_id})")
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## Summary
 
 # COMMAND ----------
