@@ -83,8 +83,7 @@ jobs:
         run: |
           databricks bundle run daily_databricks_podcast \
             --target $TARGET \
-            --param days_back=${{ github.event.inputs.days_back || '1' }} \
-            --param max_stories=10
+            --params "days_back=${{ github.event.inputs.days_back || '1' }},max_stories=10"
         timeout-minutes: 60
 
       # ── Summary ────────────────────────────────────────────────────────────
