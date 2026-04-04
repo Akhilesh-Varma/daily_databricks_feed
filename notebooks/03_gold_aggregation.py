@@ -114,7 +114,7 @@ daily_summary = {
         "max_stories": MAX_STORIES,
         "diversity_weight": DIVERSITY_WEIGHT,
         "total_candidates": len(silver_records),
-    }
+    },
 }
 
 # COMMAND ----------
@@ -177,11 +177,19 @@ from pyspark.sql import SparkSession
 
 spark = SparkSession.builder.getOrCreate()
 
+
 def _get_run_id():
     try:
-        return dbutils.notebook.entry_point.getDbutils().notebook().getContext().tags().apply("jobRunId")
+        return (
+            dbutils.notebook.entry_point.getDbutils()
+            .notebook()
+            .getContext()
+            .tags()
+            .apply("jobRunId")
+        )
     except Exception:
         return f"local-{uuid.uuid4().hex[:8]}"
+
 
 _run_id = _get_run_id()
 _pipeline_run_at = datetime.now(timezone.utc).isoformat()
@@ -194,54 +202,56 @@ if top_stories:
 
     stories_rows = []
     for rank_idx, story in enumerate(top_stories, 1):
-        stories_rows.append({
-            "episode_date":     date_str,
-            "rank":             rank_idx,
-            "id":               str(story.get("id", "")),
-            "source":           str(story.get("source", "")),
-            "title":            str(story.get("title_cleaned") or story.get("title", "")),
-            "content":          story.get("content_cleaned") or story.get("content"),
-            "url":              str(story.get("url", "")),
-            "score":            int(story.get("score", 0) or 0),
-            "comments_count":   int(story.get("comments_count", 0) or 0),
-            "quality_score":    float(story.get("quality_score", 0.0) or 0.0),
-            "keywords":         json.dumps(story.get("keywords", [])),
-            "_run_id":          _run_id,
-            "_pipeline_run_at": _pipeline_run_at,
-            "_aggregated_at":   datetime.now(timezone.utc).isoformat(),
-        })
+        stories_rows.append(
+            {
+                "episode_date": date_str,
+                "rank": rank_idx,
+                "id": str(story.get("id", "")),
+                "source": str(story.get("source", "")),
+                "title": str(story.get("title_cleaned") or story.get("title", "")),
+                "content": story.get("content_cleaned") or story.get("content"),
+                "url": str(story.get("url", "")),
+                "score": int(story.get("score", 0) or 0),
+                "comments_count": int(story.get("comments_count", 0) or 0),
+                "quality_score": float(story.get("quality_score", 0.0) or 0.0),
+                "keywords": json.dumps(story.get("keywords", [])),
+                "_run_id": _run_id,
+                "_pipeline_run_at": _pipeline_run_at,
+                "_aggregated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
     df_stories = spark.createDataFrame(pd.DataFrame(stories_rows))
     (
-        df_stories.write
-                  .format("delta")
-                  .mode("append")
-                  .option("mergeSchema", "true")
-                  .saveAsTable("news_pipeline.daily_databricks_feed.gold_top_stories_nb")
+        df_stories.write.format("delta")
+        .mode("append")
+        .option("mergeSchema", "true")
+        .saveAsTable("news_pipeline.daily_databricks_feed.gold_top_stories_nb")
     )
-    logger.info(f"Wrote {len(stories_rows)} top stories to Delta gold_top_stories_nb (run_id={_run_id})")
+    logger.info(
+        f"Wrote {len(stories_rows)} top stories to Delta gold_top_stories_nb (run_id={_run_id})"
+    )
 
 # Write daily summary
 summary_row = {
-    "episode_date":        date_str,
-    "story_count":         len(top_stories),
+    "episode_date": date_str,
+    "story_count": len(top_stories),
     "unique_source_count": len(source_counts),
     "source_distribution": json.dumps(source_counts),
-    "total_candidates":    len(silver_records),
-    "max_stories_param":   MAX_STORIES,
-    "diversity_weight":    DIVERSITY_WEIGHT,
-    "_run_id":             _run_id,
-    "_pipeline_run_at":    _pipeline_run_at,
-    "_aggregated_at":      datetime.now(timezone.utc).isoformat(),
+    "total_candidates": len(silver_records),
+    "max_stories_param": MAX_STORIES,
+    "diversity_weight": DIVERSITY_WEIGHT,
+    "_run_id": _run_id,
+    "_pipeline_run_at": _pipeline_run_at,
+    "_aggregated_at": datetime.now(timezone.utc).isoformat(),
 }
 
 df_summary = spark.createDataFrame([summary_row])
 (
-    df_summary.write
-              .format("delta")
-              .mode("append")
-              .option("mergeSchema", "true")
-              .saveAsTable("news_pipeline.daily_databricks_feed.gold_daily_summary_nb")
+    df_summary.write.format("delta")
+    .mode("append")
+    .option("mergeSchema", "true")
+    .saveAsTable("news_pipeline.daily_databricks_feed.gold_daily_summary_nb")
 )
 logger.info(f"Wrote daily summary to Delta gold_daily_summary_nb (run_id={_run_id})")
 
@@ -257,30 +267,41 @@ stories_for_script = []
 
 for story in top_stories:
     # Get the best available content
-    content = story.get("content_cleaned") or story.get("content") or story.get("title_cleaned") or story.get("title", "")
+    content = (
+        story.get("content_cleaned")
+        or story.get("content")
+        or story.get("title_cleaned")
+        or story.get("title", "")
+    )
 
     # Truncate long content
     if len(content) > 500:
         content = content[:500] + "..."
 
-    stories_for_script.append({
-        "title": story.get("title_cleaned") or story.get("title", "Untitled"),
-        "content": content,
-        "source": story.get("source", "unknown"),
-        "url": story.get("url", ""),
-        "score": story.get("score", 0),
-        "quality_score": story.get("quality_score", 0),
-        "keywords": story.get("keywords", []),
-    })
+    stories_for_script.append(
+        {
+            "title": story.get("title_cleaned") or story.get("title", "Untitled"),
+            "content": content,
+            "source": story.get("source", "unknown"),
+            "url": story.get("url", ""),
+            "score": story.get("score", 0),
+            "quality_score": story.get("quality_score", 0),
+            "keywords": story.get("keywords", []),
+        }
+    )
 
 # Save stories for script generation
 script_input_file = Path(DATA_PATH) / "script_input.json"
 
 with open(script_input_file, "w") as f:
-    json.dump({
-        "date": date_str,
-        "stories": stories_for_script,
-    }, f, indent=2)
+    json.dump(
+        {
+            "date": date_str,
+            "stories": stories_for_script,
+        },
+        f,
+        indent=2,
+    )
 
 logger.info(f"Saved script input to {script_input_file}")
 
@@ -306,9 +327,17 @@ print(f"  - {script_input_file}")
 print("=" * 60)
 
 # Return results for workflow
-dbutils.notebook.exit(json.dumps({
-    "date": date_str,
-    "stories_selected": len(top_stories),
-    "total_candidates": len(silver_records),
-    "sources": source_counts,
-})) if "dbutils" in dir() else None
+(
+    dbutils.notebook.exit(
+        json.dumps(
+            {
+                "date": date_str,
+                "stories_selected": len(top_stories),
+                "total_candidates": len(silver_records),
+                "sources": source_counts,
+            }
+        )
+    )
+    if "dbutils" in dir()
+    else None
+)

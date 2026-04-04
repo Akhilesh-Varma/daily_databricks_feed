@@ -21,15 +21,34 @@ from pyspark.sql.window import Window
 
 # ── Keyword list for enrichment ────────────────────────────────────────────────
 DATABRICKS_KEYWORDS = [
-    "databricks", "delta lake", "delta", "apache spark", "spark", "lakehouse",
-    "mlflow", "unity catalog", "delta sharing", "databricks sql", "pyspark",
-    "structured streaming", "autoloader", "photon", "mosaic", "dolly", "dbrx",
-    "data engineering", "feature store", "vector search", "genie", "lakeflow",
+    "databricks",
+    "delta lake",
+    "delta",
+    "apache spark",
+    "spark",
+    "lakehouse",
+    "mlflow",
+    "unity catalog",
+    "delta sharing",
+    "databricks sql",
+    "pyspark",
+    "structured streaming",
+    "autoloader",
+    "photon",
+    "mosaic",
+    "dolly",
+    "dbrx",
+    "data engineering",
+    "feature store",
+    "vector search",
+    "genie",
+    "lakeflow",
 ]
 
 BRONZE_LANDING_TABLE = "news_pipeline.daily_databricks_feed.bronze_raw_landing"
 
 # ── UDFs ───────────────────────────────────────────────────────────────────────
+
 
 @F.udf(returnType=ArrayType(StringType()))
 def extract_keywords(title, content):
@@ -42,16 +61,16 @@ def extract_keywords(title, content):
 def quality_score_udf(score, comments_count, content, n_keywords):
     """Compute a 0–1 quality score from available signals."""
     try:
-        s    = int(score or 0)
-        c    = int(comments_count or 0)
+        s = int(score or 0)
+        c = int(comments_count or 0)
         clen = len(content or "")
-        nk   = int(n_keywords or 0)
+        nk = int(n_keywords or 0)
 
-        title_pts   = 0.2
+        title_pts = 0.2
         content_pts = 0.3 if clen > 150 else (0.15 if clen > 30 else 0.0)
-        social_pts  = 0.2 if s > 10    else (0.1  if s  > 0  else 0.0)
-        comment_pts = 0.1 if c > 5     else (0.05 if c  > 0  else 0.0)
-        keyword_pts = 0.2 if nk > 2    else (0.1  if nk > 0  else 0.0)
+        social_pts = 0.2 if s > 10 else (0.1 if s > 0 else 0.0)
+        comment_pts = 0.1 if c > 5 else (0.05 if c > 0 else 0.0)
+        keyword_pts = 0.2 if nk > 2 else (0.1 if nk > 0 else 0.0)
 
         return min(1.0, title_pts + content_pts + social_pts + comment_pts + keyword_pts)
     except Exception:
@@ -59,6 +78,7 @@ def quality_score_udf(score, comments_count, content, n_keywords):
 
 
 # ── BRONZE: stream from landing table ─────────────────────────────────────────
+
 
 @dp.table(
     name="bronze_news",
@@ -72,14 +92,11 @@ def quality_score_udf(score, comments_count, content, n_keywords):
     },
 )
 def bronze_news():
-    return (
-        spark.readStream
-             .format("delta")
-             .table(BRONZE_LANDING_TABLE)
-    )
+    return spark.readStream.format("delta").table(BRONZE_LANDING_TABLE)
 
 
 # ── SILVER: clean + enrich ────────────────────────────────────────────────────
+
 
 @dp.table(
     name="silver_news",
@@ -93,14 +110,15 @@ def bronze_news():
     },
 )
 @dp.expect_or_drop("has_title", "title IS NOT NULL AND length(title) > 5")
-@dp.expect_or_drop("has_url",   "url IS NOT NULL AND length(url) > 10")
+@dp.expect_or_drop("has_url", "url IS NOT NULL AND length(url) > 10")
 @dp.expect_or_drop("quality_above_floor", "quality_score >= 0.1")
 def silver_news():
     def clean(col):
         return F.trim(
             F.regexp_replace(
                 F.regexp_replace(col, r"<[^>]+>", " "),
-                r"\s+", " ",
+                r"\s+",
+                " ",
             )
         )
 
@@ -108,7 +126,7 @@ def silver_news():
 
     return (
         spark.readStream.table("bronze_news")
-        .withColumn("title_cleaned",   clean(F.col("title")))
+        .withColumn("title_cleaned", clean(F.col("title")))
         .withColumn("content_cleaned", clean(F.coalesce(F.col("content"), F.lit(""))))
         .withColumn("keywords", kw_col)
         .withColumn(
@@ -120,12 +138,13 @@ def silver_news():
                 F.size(kw_col),
             ),
         )
-        .withColumn("_ingestion_date",  F.to_date(F.col("_pipeline_run_at")))
+        .withColumn("_ingestion_date", F.to_date(F.col("_pipeline_run_at")))
         .withColumn("_transformed_at", F.current_timestamp())
     )
 
 
 # ── GOLD: top stories per run + date ─────────────────────────────────────────
+
 
 @dp.materialized_view(
     name="gold_top_stories",
@@ -150,10 +169,19 @@ def gold_top_stories():
         .filter(F.col("rank") <= 10)
         .withColumn("_aggregated_at", F.current_timestamp())
         .select(
-            "_run_id", "_ingestion_date", "_pipeline_run_at",
-            "rank", "id", "source",
-            "title_cleaned", "content_cleaned", "url",
-            "score", "comments_count", "quality_score", "keywords",
+            "_run_id",
+            "_ingestion_date",
+            "_pipeline_run_at",
+            "rank",
+            "id",
+            "source",
+            "title_cleaned",
+            "content_cleaned",
+            "url",
+            "score",
+            "comments_count",
+            "quality_score",
+            "keywords",
             "_aggregated_at",
         )
     )
@@ -175,35 +203,23 @@ def gold_daily_summary():
     top = spark.read.table("gold_top_stories")
 
     # Per (run, date, source) counts
-    src_counts = (
-        top.groupBy("_run_id", "_ingestion_date", "source")
-           .agg(F.count("*").alias("cnt"))
-    )
+    src_counts = top.groupBy("_run_id", "_ingestion_date", "source").agg(F.count("*").alias("cnt"))
 
     # Source distribution as JSON map
-    src_dist = (
-        src_counts
-        .groupBy("_run_id", "_ingestion_date")
-        .agg(
-            F.to_json(
-                F.map_from_entries(
-                    F.collect_list(
-                        F.struct(F.col("source").alias("key"), F.col("cnt").alias("value"))
-                    )
-                )
-            ).alias("source_distribution")
-        )
+    src_dist = src_counts.groupBy("_run_id", "_ingestion_date").agg(
+        F.to_json(
+            F.map_from_entries(
+                F.collect_list(F.struct(F.col("source").alias("key"), F.col("cnt").alias("value")))
+            )
+        ).alias("source_distribution")
     )
 
-    summary = (
-        top.groupBy("_run_id", "_ingestion_date", "_pipeline_run_at")
-           .agg(
-               F.count("id").alias("story_count"),
-               F.countDistinct("source").alias("unique_source_count"),
-               F.max("quality_score").alias("max_quality_score"),
-               F.avg("quality_score").alias("avg_quality_score"),
-               F.current_timestamp().alias("_aggregated_at"),
-           )
+    summary = top.groupBy("_run_id", "_ingestion_date", "_pipeline_run_at").agg(
+        F.count("id").alias("story_count"),
+        F.countDistinct("source").alias("unique_source_count"),
+        F.max("quality_score").alias("max_quality_score"),
+        F.avg("quality_score").alias("avg_quality_score"),
+        F.current_timestamp().alias("_aggregated_at"),
     )
 
     return summary.join(src_dist, ["_run_id", "_ingestion_date"])

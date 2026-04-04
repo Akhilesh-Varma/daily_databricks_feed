@@ -42,13 +42,29 @@ _WIDGET_KEYS = [
     "GCS_BUCKET_NAME",
     "AUDIO_BASE_URL",
 ]
+# Source 1: notebook widgets (job base_parameters) — try both APIs
 for _k in _WIDGET_KEYS:
-    try:
-        _v = dbutils.widgets.getArgument(_k, "")
-        if _v:
-            os.environ[_k] = _v
-    except Exception:
-        pass
+    if not os.environ.get(_k):
+        try:
+            _v = dbutils.widgets.get(_k)
+            if _v:
+                os.environ[_k] = _v
+        except Exception:
+            try:
+                _v = dbutils.widgets.getArgument(_k, "")
+                if _v:
+                    os.environ[_k] = _v
+            except Exception:
+                pass
+# Source 2: Databricks Secret Scope (most reliable for large/complex credentials)
+for _k in _WIDGET_KEYS:
+    if not os.environ.get(_k):
+        try:
+            _v = dbutils.secrets.get(scope="daily-podcast", key=_k)
+            if _v:
+                os.environ[_k] = _v
+        except Exception:
+            pass
 secrets = SecretsManager()
 
 # COMMAND ----------
