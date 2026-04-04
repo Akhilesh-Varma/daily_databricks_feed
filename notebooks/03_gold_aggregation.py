@@ -24,7 +24,10 @@ project_root = Path(os.getcwd()).parent
 # COMMAND ----------
 
 # Configuration
-DATA_PATH = os.environ.get("DATA_PATH", "/Volumes/news_pipeline/default/podcast_data")
+try:
+    DATA_PATH = dbutils.widgets.get("DATA_PATH")
+except Exception:
+    DATA_PATH = os.environ.get("DATA_PATH", "/Volumes/news_pipeline/default/podcast_data")
 try:
     MAX_STORIES = int(dbutils.widgets.get("MAX_STORIES"))
 except Exception:

@@ -36,7 +36,10 @@ secrets = SecretsManager()
 # COMMAND ----------
 
 # Configuration
-DATA_PATH = os.environ.get("DATA_PATH", "/Volumes/news_pipeline/default/podcast_data")
+try:
+    DATA_PATH = dbutils.widgets.get("DATA_PATH")
+except Exception:
+    DATA_PATH = os.environ.get("DATA_PATH", "/Volumes/news_pipeline/default/podcast_data")
 GCS_BUCKET = secrets.get("gcs_bucket_name", "")
 AUDIO_BASE_URL = secrets.get("audio_base_url", "")
 PODCAST_AUTHOR = os.environ.get("PODCAST_AUTHOR", "Daily Databricks Team")

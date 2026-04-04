@@ -36,7 +36,10 @@ secrets = SecretsManager()
 # COMMAND ----------
 
 # Configuration
-DATA_PATH = os.environ.get("DATA_PATH", "/Volumes/news_pipeline/default/podcast_data")
+try:
+    DATA_PATH = dbutils.widgets.get("DATA_PATH")
+except Exception:
+    DATA_PATH = os.environ.get("DATA_PATH", "/Volumes/news_pipeline/default/podcast_data")
 PODCAST_NAME = os.environ.get("PODCAST_NAME", "Daily Databricks Digest")
 
 logger.info(f"Data path: {DATA_PATH}")

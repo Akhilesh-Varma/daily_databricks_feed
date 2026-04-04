@@ -58,6 +58,7 @@ resources:
             notebook_path: ../notebooks/01_bronze_ingestion.py
             source: WORKSPACE
             base_parameters:
+              DATA_PATH: "${var.data_path}"
               DAYS_BACK: "{{job.parameters.days_back}}"
               REDDIT_CLIENT_ID: "${var.reddit_client_id}"
               REDDIT_CLIENT_SECRET: "${var.reddit_client_secret}"
@@ -79,6 +80,8 @@ resources:
           notebook_task:
             notebook_path: ../notebooks/02_silver_transformation.py
             source: WORKSPACE
+            base_parameters:
+              DATA_PATH: "${var.data_path}"
           environment_key: "default"
 
         - task_key: gold_aggregation
@@ -89,6 +92,7 @@ resources:
             notebook_path: ../notebooks/03_gold_aggregation.py
             source: WORKSPACE
             base_parameters:
+              DATA_PATH: "${var.data_path}"
               MAX_STORIES: "{{job.parameters.max_stories}}"
           environment_key: "default"
 
@@ -100,6 +104,7 @@ resources:
             notebook_path: ../notebooks/04_script_generation.py
             source: WORKSPACE
             base_parameters:
+              DATA_PATH: "${var.data_path}"
               GROQ_API_KEY: "${var.groq_api_key}"
               CLAUDE_API_KEY: "${var.claude_api_key}"
               GOOGLE_API_KEY: "${var.google_api_key}"
@@ -116,6 +121,7 @@ resources:
             notebook_path: ../notebooks/05_audio_generation.py
             source: WORKSPACE
             base_parameters:
+              DATA_PATH: "${var.data_path}"
               GCP_SERVICE_ACCOUNT_JSON: "${var.gcp_service_account_json}"
           environment_key: "default"
           timeout_seconds: 1800
@@ -130,6 +136,7 @@ resources:
             notebook_path: ../notebooks/06_publish_podcast.py
             source: WORKSPACE
             base_parameters:
+              DATA_PATH: "${var.data_path}"
               GCP_SERVICE_ACCOUNT_JSON: "${var.gcp_service_account_json}"
               GCS_BUCKET_NAME: "${var.gcs_bucket_name}"
               AUDIO_BASE_URL: "${var.audio_base_url}"
