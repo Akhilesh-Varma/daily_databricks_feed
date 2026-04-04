@@ -41,6 +41,7 @@ resources:
       environments:
         - environment_key: "default"
           spec:
+            client: "3"
             dependencies:
               - ${workspace.root_path}/artifacts/.internal/daily_databricks_feed-0.1.0-py3-none-any.whl
               - requests>=2.31.0
@@ -138,10 +139,6 @@ resources:
           min_retry_interval_millis: 30000
 
       max_concurrent_runs: 1
-
-      email_notifications:
-        on_failure:
-          - ${SERVICE_PRINCIPAL_NAME}
 
       tags:
         project: "daily-databricks-podcast"

@@ -72,7 +72,7 @@ logger.info("Data path:       %s", DATA_PATH)
 logger.info("Days back:       %d", DAYS_BACK)
 logger.info("Checkpoint path: %s", CHECKPOINT_PATH)
 
-Path(DATA_PATH).mkdir(parents=True, exist_ok=True)
+dbutils.fs.mkdirs(DATA_PATH)
 
 # COMMAND ----------
 
