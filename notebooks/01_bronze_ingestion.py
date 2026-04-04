@@ -27,16 +27,12 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install requests praw feedparser python-dotenv
-
-# COMMAND ----------
-
 import json
 import logging
 import os
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pyspark.sql.functions as F
@@ -46,8 +42,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 project_root = Path(os.getcwd()).parent
-if str(project_root / "src") not in sys.path:
-    sys.path.insert(0, str(project_root / "src"))
 
 # COMMAND ----------
 
@@ -64,7 +58,7 @@ secrets.print_status()
 # COMMAND ----------
 
 # Configuration
-DATA_PATH = os.environ.get("DATA_PATH", str(project_root / "data"))
+DATA_PATH = os.environ.get("DATA_PATH", "/Volumes/news_pipeline/default/podcast_data")
 try:
     DAYS_BACK = int(dbutils.widgets.get("DAYS_BACK"))
 except Exception:
@@ -315,8 +309,8 @@ logger.info("Streaming ingestion complete")
 # COMMAND ----------
 
 # Read what was written in this run and save to JSON.
-# Notebooks 02–06 still read from bronze_news_raw.json, so we keep that file
-# up-to-date as a snapshot that accumulates new records across runs.
+# Notebooks 02–06 read from bronze_news_raw.json. We accumulate recent records
+# (up to DAYS_BACK + 1 days) so incremental runs stay fast while the file stays bounded.
 
 run_df = (
     spark.table("news_pipeline.daily_databricks_feed.bronze_raw_landing")
@@ -325,6 +319,14 @@ run_df = (
 
 new_records_count = run_df.count()
 logger.info("Records written this run: %d", new_records_count)
+
+# Guard: only call toPandas when the result set is reasonable (<= 5000 rows)
+if new_records_count > 5000:
+    logger.warning(
+        "Run produced %d records — truncating JSON export to 5000 for driver safety",
+        new_records_count,
+    )
+    run_df = run_df.limit(5000)
 
 bronze_records = run_df.toPandas().to_dict(orient="records")
 
@@ -337,6 +339,13 @@ if bronze_file.exists():
             existing_records = json.load(f)
     except Exception as exc:
         logger.warning("Could not load existing JSON: %s", exc)
+
+# Drop records older than (DAYS_BACK + 1) days to prevent unbounded growth
+cutoff = (datetime.now(timezone.utc) - timedelta(days=DAYS_BACK + 1)).isoformat()
+existing_records = [
+    r for r in existing_records
+    if str(r.get("fetched_at", "")).replace("Z", "+00:00") >= cutoff
+]
 
 existing_ids = {r["id"] for r in existing_records}
 new_for_json = [r for r in bronze_records if r["id"] not in existing_ids]

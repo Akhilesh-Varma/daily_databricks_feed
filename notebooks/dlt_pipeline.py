@@ -2,20 +2,19 @@
 # MAGIC %md
 # MAGIC # DLT Pipeline: Bronze → Silver → Gold
 # MAGIC
-# MAGIC Delta Live Tables pipeline that reads new records from `bronze_raw_landing`
+# MAGIC Spark Declarative Pipeline that reads new records from `bronze_raw_landing`
 # MAGIC (populated by notebook 01) and produces versioned Silver and Gold tables.
 # MAGIC Every run appends — nothing is ever overwritten.
 # MAGIC
 # MAGIC **Tables created:**
-# MAGIC - `bronze_news`       – streaming, raw records from landing table
-# MAGIC - `silver_news`       – streaming, cleaned + keyword-enriched
-# MAGIC - `gold_top_stories`  – batch, top-10 per (_run_id, _ingestion_date)
-# MAGIC - `gold_daily_summary` – batch, one row per (_run_id, _ingestion_date)
+# MAGIC - `bronze_news`        – streaming table, raw records from landing table
+# MAGIC - `silver_news`        – streaming table, cleaned + keyword-enriched
+# MAGIC - `gold_top_stories`   – materialized view, top-10 per (_run_id, _ingestion_date)
+# MAGIC - `gold_daily_summary` – materialized view, one row per (_run_id, _ingestion_date)
 
 # COMMAND ----------
 
-import dlt
-import json
+from pyspark import pipelines as dp
 from pyspark.sql import functions as F
 from pyspark.sql.types import ArrayType, StringType, DoubleType
 from pyspark.sql.window import Window
@@ -44,22 +43,24 @@ def quality_score_udf(score, comments_count, content, n_keywords):
     """Compute a 0–1 quality score from available signals."""
     try:
         s    = int(score or 0)
+        c    = int(comments_count or 0)
         clen = len(content or "")
         nk   = int(n_keywords or 0)
 
         title_pts   = 0.2
         content_pts = 0.3 if clen > 150 else (0.15 if clen > 30 else 0.0)
-        social_pts  = 0.3 if s > 10    else (0.15 if s  > 0  else 0.0)
+        social_pts  = 0.2 if s > 10    else (0.1  if s  > 0  else 0.0)
+        comment_pts = 0.1 if c > 5     else (0.05 if c  > 0  else 0.0)
         keyword_pts = 0.2 if nk > 2    else (0.1  if nk > 0  else 0.0)
 
-        return min(1.0, title_pts + content_pts + social_pts + keyword_pts)
+        return min(1.0, title_pts + content_pts + social_pts + comment_pts + keyword_pts)
     except Exception:
         return 0.1
 
 
 # ── BRONZE: stream from landing table ─────────────────────────────────────────
 
-@dlt.table(
+@dp.table(
     name="bronze_news",
     comment=(
         "Raw news streamed from bronze_raw_landing. "
@@ -68,7 +69,6 @@ def quality_score_udf(score, comments_count, content, n_keywords):
     table_properties={
         "quality": "bronze",
         "pipelines.autoOptimize.managed": "true",
-        "delta.autoOptimize.optimizeWrite": "true",
     },
 )
 def bronze_news():
@@ -81,7 +81,7 @@ def bronze_news():
 
 # ── SILVER: clean + enrich ────────────────────────────────────────────────────
 
-@dlt.table(
+@dp.table(
     name="silver_news",
     comment=(
         "Cleaned, keyword-enriched articles. "
@@ -92,9 +92,9 @@ def bronze_news():
         "pipelines.autoOptimize.managed": "true",
     },
 )
-@dlt.expect_or_drop("has_title", "title IS NOT NULL AND length(title) > 5")
-@dlt.expect_or_drop("has_url",   "url IS NOT NULL AND length(url) > 10")
-@dlt.expect("quality_above_floor", "quality_score >= 0.1")
+@dp.expect_or_drop("has_title", "title IS NOT NULL AND length(title) > 5")
+@dp.expect_or_drop("has_url",   "url IS NOT NULL AND length(url) > 10")
+@dp.expect_or_drop("quality_above_floor", "quality_score >= 0.1")
 def silver_news():
     def clean(col):
         return F.trim(
@@ -107,7 +107,7 @@ def silver_news():
     kw_col = extract_keywords(F.col("title"), F.col("content"))
 
     return (
-        dlt.readStream("bronze_news")
+        spark.readStream.table("bronze_news")
         .withColumn("title_cleaned",   clean(F.col("title")))
         .withColumn("content_cleaned", clean(F.coalesce(F.col("content"), F.lit(""))))
         .withColumn("keywords", kw_col)
@@ -120,13 +120,14 @@ def silver_news():
                 F.size(kw_col),
             ),
         )
+        .withColumn("_ingestion_date",  F.to_date(F.col("_pipeline_run_at")))
         .withColumn("_transformed_at", F.current_timestamp())
     )
 
 
 # ── GOLD: top stories per run + date ─────────────────────────────────────────
 
-@dlt.table(
+@dp.materialized_view(
     name="gold_top_stories",
     comment=(
         "Top 10 quality stories per (_run_id, _ingestion_date). "
@@ -143,7 +144,7 @@ def gold_top_stories():
         F.desc("quality_score"), F.desc("score")
     )
     return (
-        dlt.read("silver_news")
+        spark.read.table("silver_news")
         .filter(F.col("quality_score") >= 0.2)
         .withColumn("rank", F.row_number().over(w))
         .filter(F.col("rank") <= 10)
@@ -158,7 +159,7 @@ def gold_top_stories():
     )
 
 
-@dlt.table(
+@dp.materialized_view(
     name="gold_daily_summary",
     comment=(
         "One row per (_run_id, _ingestion_date) with story counts and source breakdown. "
@@ -171,7 +172,7 @@ def gold_top_stories():
     },
 )
 def gold_daily_summary():
-    top = dlt.read("gold_top_stories")
+    top = spark.read.table("gold_top_stories")
 
     # Per (run, date, source) counts
     src_counts = (

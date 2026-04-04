@@ -22,15 +22,12 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Add src to path for local development
 project_root = Path(os.getcwd()).parent
-if str(project_root / "src") not in sys.path:
-    sys.path.insert(0, str(project_root / "src"))
 
 # COMMAND ----------
 
 # Configuration
-DATA_PATH = os.environ.get("DATA_PATH", str(project_root / "data"))
+DATA_PATH = os.environ.get("DATA_PATH", "/Volumes/news_pipeline/default/podcast_data")
 
 logger.info(f"Data path: {DATA_PATH}")
 

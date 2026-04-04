@@ -9,10 +9,6 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install requests
-
-# COMMAND ----------
-
 import os
 import sys
 import json
@@ -24,10 +20,7 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Add src to path for local development
 project_root = Path(os.getcwd()).parent
-if str(project_root / "src") not in sys.path:
-    sys.path.insert(0, str(project_root / "src"))
 
 # COMMAND ----------
 
@@ -43,7 +36,7 @@ secrets = SecretsManager()
 # COMMAND ----------
 
 # Configuration
-DATA_PATH = os.environ.get("DATA_PATH", str(project_root / "data"))
+DATA_PATH = os.environ.get("DATA_PATH", "/Volumes/news_pipeline/default/podcast_data")
 PODCAST_NAME = os.environ.get("PODCAST_NAME", "Daily Databricks Digest")
 
 logger.info(f"Data path: {DATA_PATH}")
@@ -90,6 +83,7 @@ from daily_databricks_feed.aggregation.script_generator import ScriptGenerator
 
 # Initialize — Claude key is read from CLAUDE_API_KEY env var (injected by Databricks job)
 generator = ScriptGenerator(
+    groq_api_key=secrets.get("groq_api_key"),
     anthropic_api_key=secrets.get("claude_api_key"),
     google_api_key=secrets.get("google_api_key"),
 )

@@ -57,6 +57,12 @@ SECRETS = {
         required=False,
         description="Public URL base for audio files",
     ),
+    "groq_api_key": SecretConfig(
+        name="groq_api_key",
+        env_var="GROQ_API_KEY",
+        required=False,
+        description="Groq API key for Llama 3.3 70B script generation (primary LLM)",
+    ),
     "claude_api_key": SecretConfig(
         name="claude_api_key",
         env_var="CLAUDE_API_KEY",

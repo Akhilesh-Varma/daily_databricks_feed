@@ -92,16 +92,20 @@ resources:
           environment_key: "default"
 
         - task_key: script_generation
-          description: "Generate podcast script using Claude"
+          description: "Generate podcast script using Groq (primary) / Claude / Gemini"
           depends_on:
             - task_key: gold_aggregation
           notebook_task:
             notebook_path: ../notebooks/04_script_generation.py
             source: WORKSPACE
             base_parameters:
+              GROQ_API_KEY: "${var.groq_api_key}"
               CLAUDE_API_KEY: "${var.claude_api_key}"
               GOOGLE_API_KEY: "${var.google_api_key}"
           environment_key: "default"
+          timeout_seconds: 600
+          max_retries: 1
+          min_retry_interval_millis: 30000
 
         - task_key: audio_generation
           description: "Convert script to MP3 using Google Cloud TTS"
@@ -113,6 +117,9 @@ resources:
             base_parameters:
               GCP_SERVICE_ACCOUNT_JSON: "${var.gcp_service_account_json}"
           environment_key: "default"
+          timeout_seconds: 1800
+          max_retries: 1
+          min_retry_interval_millis: 60000
 
         - task_key: publish_podcast
           description: "Upload audio to GCS and update RSS feed"
@@ -126,8 +133,15 @@ resources:
               GCS_BUCKET_NAME: "${var.gcs_bucket_name}"
               AUDIO_BASE_URL: "${var.audio_base_url}"
           environment_key: "default"
+          timeout_seconds: 600
+          max_retries: 2
+          min_retry_interval_millis: 30000
 
       max_concurrent_runs: 1
+
+      email_notifications:
+        on_failure:
+          - ${SERVICE_PRINCIPAL_NAME}
 
       tags:
         project: "daily-databricks-podcast"

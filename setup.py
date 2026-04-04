@@ -9,11 +9,11 @@ setup(
     name="daily-databricks-feed",
     version="0.1.0",
     author="Daily Databricks Feed Team",
-    author_email="podcast@example.com",
+    author_email="",
     description="A daily podcast generator for Databricks and data engineering news",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/daily-databricks-feed",
+    url="",
     package_dir={"": "src"},
     packages=find_packages(where="src"),
     classifiers=[

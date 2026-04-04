@@ -17,7 +17,7 @@ resources:
       channel: CURRENT
       continuous: false
 
-      development: true
+      development: false
 
       tags:
         project: "daily-databricks-podcast"
