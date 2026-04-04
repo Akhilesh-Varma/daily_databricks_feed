@@ -58,6 +58,9 @@ jobs:
 
   validate-bundle:
     runs-on: ubuntu-latest
+    env:
+      DATABRICKS_HOST: https://dbc-438ac3cd-0325.cloud.databricks.com
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
 
     steps:
       - name: Checkout code
@@ -73,10 +76,7 @@ jobs:
           python -c "import yaml; yaml.safe_load(open('resources/pipeline.yml')); print('resources/pipeline.yml OK')"
 
       - name: Validate bundle structure (DAB semantics)
-        env:
-          DATABRICKS_HOST: https://dbc-438ac3cd-0325.cloud.databricks.com
-          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
-        run: |
-          databricks bundle validate --target dev
         # Skipped on forks / PRs without DATABRICKS_TOKEN
         if: env.DATABRICKS_TOKEN != ''
+        run: |
+          databricks bundle validate --target dev
