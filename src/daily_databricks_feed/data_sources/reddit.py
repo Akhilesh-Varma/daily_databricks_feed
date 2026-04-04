@@ -265,4 +265,3 @@ class RedditSource(BaseDataSource):
         except Exception as e:
             self.logger.warning(f"Error parsing submission: {e}")
             return None
-

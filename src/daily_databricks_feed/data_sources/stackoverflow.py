@@ -77,9 +77,7 @@ class StackOverflowSource(BaseDataSource):
         if since_epoch is not None:
             from_date = since_epoch
         else:
-            from_date = int(
-                (datetime.now(timezone.utc) - timedelta(days=days_back)).timestamp()
-            )
+            from_date = int((datetime.now(timezone.utc) - timedelta(days=days_back)).timestamp())
 
         all_items: List[NewsItem] = []
         seen_ids: set = set()
@@ -121,9 +119,7 @@ class StackOverflowSource(BaseDataSource):
         if self.api_key:
             params["key"] = self.api_key
 
-        resp = requests.get(
-            f"{self.BASE_URL}/questions", params=params, timeout=30
-        )
+        resp = requests.get(f"{self.BASE_URL}/questions", params=params, timeout=30)
         resp.raise_for_status()
 
         data = resp.json()
@@ -160,6 +156,7 @@ class StackOverflowSource(BaseDataSource):
         body = q.get("body") or ""
         # Strip HTML tags from body
         import re
+
         content = re.sub(r"<[^>]+>", " ", body)
         content = re.sub(r"\s+", " ", content).strip()[:1000]
 

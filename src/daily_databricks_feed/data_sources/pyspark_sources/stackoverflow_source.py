@@ -33,9 +33,7 @@ class StackOverflowStreamReader(BaseNewsStreamReader):
                 limit=int(self.options.get("limit", "50")),
                 min_answers=int(self.options.get("min_answers", "1")),
                 min_score=int(self.options.get("min_score", "1")),
-                filter_databricks=(
-                    self.options.get("filter_databricks", "true").lower() == "true"
-                ),
+                filter_databricks=(self.options.get("filter_databricks", "true").lower() == "true"),
             )
         except Exception as exc:
             logger.error("Stack Overflow fetch failed: %s", exc)

@@ -24,9 +24,9 @@ class DatabricksCommunitySource(BaseDataSource):
 
     # Endpoints to poll; each returns a page of topics
     _ENDPOINTS = [
-        "/latest.json",          # Most recently active topics
-        "/top/daily.json",       # Highest-engagement topics today
-        "/top/weekly.json",      # Weekly trending (good for slower periods)
+        "/latest.json",  # Most recently active topics
+        "/top/daily.json",  # Highest-engagement topics today
+        "/top/weekly.json",  # Weekly trending (good for slower periods)
     ]
 
     def is_available(self) -> bool:

@@ -29,14 +29,18 @@ class GitHubReleasesSource(BaseDataSource):
 
     # Repos tracked in order of relevance to Databricks practitioners
     TRACKED_REPOS = [
-        {"owner": "databricks", "repo": "databricks-sdk-py",              "label": "Databricks SDK (Python)"},
-        {"owner": "databricks", "repo": "cli",                            "label": "Databricks CLI"},
-        {"owner": "databricks", "repo": "terraform-provider-databricks",  "label": "Databricks Terraform Provider"},
-        {"owner": "delta-io",   "repo": "delta",                          "label": "Delta Lake"},
-        {"owner": "delta-io",   "repo": "delta-rs",                       "label": "Delta Lake Rust/Python"},
-        {"owner": "mlflow",     "repo": "mlflow",                         "label": "MLflow"},
-        {"owner": "apache",     "repo": "spark",                          "label": "Apache Spark"},
-        {"owner": "databricks", "repo": "databricks-sdk-java",            "label": "Databricks SDK (Java)"},
+        {"owner": "databricks", "repo": "databricks-sdk-py", "label": "Databricks SDK (Python)"},
+        {"owner": "databricks", "repo": "cli", "label": "Databricks CLI"},
+        {
+            "owner": "databricks",
+            "repo": "terraform-provider-databricks",
+            "label": "Databricks Terraform Provider",
+        },
+        {"owner": "delta-io", "repo": "delta", "label": "Delta Lake"},
+        {"owner": "delta-io", "repo": "delta-rs", "label": "Delta Lake Rust/Python"},
+        {"owner": "mlflow", "repo": "mlflow", "label": "MLflow"},
+        {"owner": "apache", "repo": "spark", "label": "Apache Spark"},
+        {"owner": "databricks", "repo": "databricks-sdk-java", "label": "Databricks SDK (Java)"},
     ]
 
     def __init__(self, token: Optional[str] = None, **kwargs):
@@ -96,7 +100,9 @@ class GitHubReleasesSource(BaseDataSource):
             except Exception as exc:
                 self.logger.error(
                     "Error fetching %s/%s: %s",
-                    repo_cfg["owner"], repo_cfg["repo"], exc,
+                    repo_cfg["owner"],
+                    repo_cfg["repo"],
+                    exc,
                 )
 
         all_items.sort(
@@ -117,9 +123,7 @@ class GitHubReleasesSource(BaseDataSource):
         label = repo_cfg["label"]
 
         url = f"{self.BASE_URL}/repos/{owner}/{repo}/releases"
-        resp = requests.get(
-            url, headers=self._headers(), params={"per_page": 10}, timeout=30
-        )
+        resp = requests.get(url, headers=self._headers(), params={"per_page": 10}, timeout=30)
         resp.raise_for_status()
 
         items: List[NewsItem] = []

@@ -132,10 +132,9 @@ class DevToSource(BaseDataSource):
             published_at=published_at,
             score=reactions,
             comments_count=comments,
-            tags=list(set(
-                [t.lower() for t in tag_list]
-                + self.extract_keywords(f"{title} {description}")
-            )),
+            tags=list(
+                set([t.lower() for t in tag_list] + self.extract_keywords(f"{title} {description}"))
+            ),
             metadata={
                 "article_id": article_id,
                 "reading_time_minutes": article.get("reading_time_minutes", 0),

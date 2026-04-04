@@ -38,9 +38,7 @@ class RSSStreamReader(BaseNewsStreamReader):
             items = source.fetch_with_retry(
                 since_epoch=start_epoch,
                 limit=int(self.options.get("limit", "50")),
-                filter_databricks=(
-                    self.options.get("filter_databricks", "true").lower() == "true"
-                ),
+                filter_databricks=(self.options.get("filter_databricks", "true").lower() == "true"),
             )
         except Exception as exc:
             logger.error("RSS fetch failed: %s", exc)

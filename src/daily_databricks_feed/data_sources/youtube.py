@@ -288,4 +288,3 @@ class YouTubeSource(BaseDataSource):
                 self.logger.warning(f"Error parsing search result: {e}")
 
         return news_items
-

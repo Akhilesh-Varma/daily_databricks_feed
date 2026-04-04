@@ -42,9 +42,7 @@ class YouTubeStreamReader(BaseNewsStreamReader):
             items = source.fetch_with_retry(
                 since_epoch=start_epoch,
                 limit=int(self.options.get("limit", "30")),
-                filter_databricks=(
-                    self.options.get("filter_databricks", "true").lower() == "true"
-                ),
+                filter_databricks=(self.options.get("filter_databricks", "true").lower() == "true"),
             )
         except Exception as exc:
             logger.error("YouTube fetch failed: %s", exc)

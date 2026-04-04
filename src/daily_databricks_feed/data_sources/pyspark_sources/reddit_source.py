@@ -47,9 +47,7 @@ class RedditStreamReader(BaseNewsStreamReader):
                 since_epoch=start_epoch,
                 min_score=int(self.options.get("min_score", "3")),
                 limit=int(self.options.get("limit", "50")),
-                filter_databricks=(
-                    self.options.get("filter_databricks", "true").lower() == "true"
-                ),
+                filter_databricks=(self.options.get("filter_databricks", "true").lower() == "true"),
             )
         except Exception as exc:
             logger.error("Reddit fetch failed: %s", exc)

@@ -199,4 +199,3 @@ class HackerNewsSource(BaseDataSource):
                 self.logger.warning(f"Error parsing hit: {e}")
 
         return items
-

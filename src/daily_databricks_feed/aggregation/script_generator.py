@@ -292,28 +292,28 @@ class ScriptGenerator:
 
     # Maps internal source names to listener-friendly labels and podcast treatment
     SOURCE_LABELS = {
-        "github_releases":     ("Official Release",       "🚀"),
-        "pypi_releases":       ("Package Release",        "📦"),
-        "rss_feed":            ("Official Blog / Article","📰"),
-        "hacker_news":         ("Tech Community Buzz",    "💬"),
-        "reddit":              ("Reddit Community",       "👥"),
-        "stackoverflow":       ("Developer Q&A",          "🔧"),
-        "devto":               ("Dev Tutorial / Article", "✍️"),
-        "databricks_community":("Databricks Community",   "🏢"),
-        "youtube":             ("Video Content",          "🎥"),
+        "github_releases": ("Official Release", "🚀"),
+        "pypi_releases": ("Package Release", "📦"),
+        "rss_feed": ("Official Blog / Article", "📰"),
+        "hacker_news": ("Tech Community Buzz", "💬"),
+        "reddit": ("Reddit Community", "👥"),
+        "stackoverflow": ("Developer Q&A", "🔧"),
+        "devto": ("Dev Tutorial / Article", "✍️"),
+        "databricks_community": ("Databricks Community", "🏢"),
+        "youtube": ("Video Content", "🎥"),
     }
 
     # Podcast treatment instructions per source type
     SOURCE_TREATMENT = {
-        "github_releases":      "Read this as a formal release announcement. Mention the version number and 1-2 key highlights from the release notes.",
-        "pypi_releases":        "Frame this as a quick package update note. Mention the version and why practitioners should upgrade.",
-        "rss_feed":             "Summarize the blog post's key insight. Add context on why this matters for data engineers.",
-        "hacker_news":          "Mention that this is trending in the tech community. Add your own take on why it caught people's attention.",
-        "reddit":               "Frame this as what the community is actively discussing. Capture the spirit of the thread.",
-        "stackoverflow":        "Present this as a common pain point developers are hitting. If answered, briefly mention the solution direction.",
-        "devto":                "Introduce this as a practical tutorial or guide. Highlight what skill or pattern listeners will learn.",
+        "github_releases": "Read this as a formal release announcement. Mention the version number and 1-2 key highlights from the release notes.",
+        "pypi_releases": "Frame this as a quick package update note. Mention the version and why practitioners should upgrade.",
+        "rss_feed": "Summarize the blog post's key insight. Add context on why this matters for data engineers.",
+        "hacker_news": "Mention that this is trending in the tech community. Add your own take on why it caught people's attention.",
+        "reddit": "Frame this as what the community is actively discussing. Capture the spirit of the thread.",
+        "stackoverflow": "Present this as a common pain point developers are hitting. If answered, briefly mention the solution direction.",
+        "devto": "Introduce this as a practical tutorial or guide. Highlight what skill or pattern listeners will learn.",
         "databricks_community": "Frame this as a real-world question or discussion from Databricks practitioners in the field.",
-        "youtube":              "Mention this as a video resource worth watching for a deeper dive.",
+        "youtube": "Mention this as a video resource worth watching for a deeper dive.",
     }
 
     def _build_prompt(self, stories: List[Dict[str, Any]], date_str: str, podcast_name: str) -> str:
@@ -336,7 +336,9 @@ Podcast treatment hint: {treatment}
         # Identify if there are any official releases today for special framing
         release_sources = {"github_releases", "pypi_releases"}
         has_releases = any(s.get("source") in release_sources for s in stories[:10])
-        release_tease = " We also have some fresh software releases to cover." if has_releases else ""
+        release_tease = (
+            " We also have some fresh software releases to cover." if has_releases else ""
+        )
 
         prompt = f"""Write a podcast script for "{podcast_name}" dated {date_str}.
 

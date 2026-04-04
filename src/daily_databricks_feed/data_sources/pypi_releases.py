@@ -23,14 +23,14 @@ class PyPIReleasesSource(BaseDataSource):
 
     # Packages to track — ordered by user impact
     TRACKED_PACKAGES = [
-        {"name": "databricks-sdk",                 "label": "Databricks SDK"},
-        {"name": "mlflow",                         "label": "MLflow"},
-        {"name": "databricks-connect",             "label": "Databricks Connect"},
-        {"name": "pyspark",                        "label": "Apache Spark (PySpark)"},
-        {"name": "delta-spark",                    "label": "Delta Lake (PySpark)"},
+        {"name": "databricks-sdk", "label": "Databricks SDK"},
+        {"name": "mlflow", "label": "MLflow"},
+        {"name": "databricks-connect", "label": "Databricks Connect"},
+        {"name": "pyspark", "label": "Apache Spark (PySpark)"},
+        {"name": "delta-spark", "label": "Delta Lake (PySpark)"},
         {"name": "databricks-feature-engineering", "label": "Databricks Feature Engineering"},
-        {"name": "databricks-vectorsearch",        "label": "Databricks Vector Search"},
-        {"name": "databricks-langchain",           "label": "Databricks LangChain Integration"},
+        {"name": "databricks-vectorsearch", "label": "Databricks Vector Search"},
+        {"name": "databricks-langchain", "label": "Databricks LangChain Integration"},
     ]
 
     def is_available(self) -> bool:
@@ -122,10 +122,7 @@ class PyPIReleasesSource(BaseDataSource):
                 "Changelog", ""
             )
 
-            content = (
-                f"{label} version {version} was released on PyPI. "
-                f"{summary}"
-            ).strip()
+            content = (f"{label} version {version} was released on PyPI. " f"{summary}").strip()
 
             title = f"{label} {version} released on PyPI"
 
@@ -151,7 +148,5 @@ class PyPIReleasesSource(BaseDataSource):
             )
             items.append(item)
 
-        self.logger.info(
-            "Found %d new release(s) for '%s' since cutoff", len(items), pkg_name
-        )
+        self.logger.info("Found %d new release(s) for '%s' since cutoff", len(items), pkg_name)
         return items

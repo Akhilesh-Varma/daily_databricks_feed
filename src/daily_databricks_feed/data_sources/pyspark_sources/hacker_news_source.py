@@ -36,9 +36,7 @@ class HackerNewsStreamReader(BaseNewsStreamReader):
                 since_epoch=start_epoch,
                 min_points=int(self.options.get("min_points", "5")),
                 limit=int(self.options.get("limit", "50")),
-                filter_databricks=(
-                    self.options.get("filter_databricks", "true").lower() == "true"
-                ),
+                filter_databricks=(self.options.get("filter_databricks", "true").lower() == "true"),
             )
         except Exception as exc:
             logger.error("HackerNews fetch failed: %s", exc)
