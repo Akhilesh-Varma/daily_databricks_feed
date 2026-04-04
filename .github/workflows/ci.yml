@@ -79,4 +79,4 @@ jobs:
         run: |
           databricks bundle validate --target dev
         # Skipped on forks / PRs without DATABRICKS_TOKEN
-        if: ${{ secrets.DATABRICKS_TOKEN != '' }}
+        if: env.DATABRICKS_TOKEN != ''
