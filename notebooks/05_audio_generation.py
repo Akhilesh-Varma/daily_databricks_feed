@@ -32,6 +32,24 @@ env_file = project_root / ".env"
 if env_file.exists():
     load_dotenv(str(env_file))
 
+_WIDGET_KEYS = [
+    "GCP_SERVICE_ACCOUNT_JSON",
+    "GROQ_API_KEY",
+    "CLAUDE_API_KEY",
+    "GOOGLE_API_KEY",
+    "REDDIT_CLIENT_ID",
+    "REDDIT_CLIENT_SECRET",
+    "YOUTUBE_API_KEY",
+    "GCS_BUCKET_NAME",
+    "AUDIO_BASE_URL",
+]
+for _k in _WIDGET_KEYS:
+    try:
+        _v = dbutils.widgets.getArgument(_k, "")
+        if _v:
+            os.environ[_k] = _v
+    except Exception:
+        pass
 secrets = SecretsManager()
 
 # COMMAND ----------
@@ -112,7 +130,9 @@ try:
     podcast_audio = tts.generate_podcast(script_data)
 
     logger.info(f"Audio generated successfully!")
-    logger.info(f"Duration: {podcast_audio.duration_seconds // 60}:{podcast_audio.duration_seconds % 60:02d}")
+    logger.info(
+        f"Duration: {podcast_audio.duration_seconds // 60}:{podcast_audio.duration_seconds % 60:02d}"
+    )
     logger.info(f"File size: {podcast_audio.file_size_bytes / 1024:.1f} KB")
     logger.info(f"Segments: {len(podcast_audio.segments)}")
 
@@ -218,37 +238,44 @@ from pyspark.sql import SparkSession
 
 spark = SparkSession.builder.getOrCreate()
 
+
 def _get_run_id():
     try:
-        return dbutils.notebook.entry_point.getDbutils().notebook().getContext().tags().apply("jobRunId")
+        return (
+            dbutils.notebook.entry_point.getDbutils()
+            .notebook()
+            .getContext()
+            .tags()
+            .apply("jobRunId")
+        )
     except Exception:
         return f"local-{uuid.uuid4().hex[:8]}"
+
 
 _run_id = _get_run_id()
 
 spark.sql("CREATE SCHEMA IF NOT EXISTS news_pipeline.daily_databricks_feed")
 
 episode_row = {
-    "episode_date":     date_str,
-    "title":            podcast_audio.title,
-    "format":           podcast_audio.format,
+    "episode_date": date_str,
+    "title": podcast_audio.title,
+    "format": podcast_audio.format,
     "duration_seconds": podcast_audio.duration_seconds,
-    "file_size_bytes":  podcast_audio.file_size_bytes,
-    "filename":         audio_filename,
-    "filepath":         str(audio_file),
-    "segment_count":    len(podcast_audio.segments),
-    "segments_json":    json.dumps(podcast_audio.segments),
-    "_run_id":          _run_id,
+    "file_size_bytes": podcast_audio.file_size_bytes,
+    "filename": audio_filename,
+    "filepath": str(audio_file),
+    "segment_count": len(podcast_audio.segments),
+    "segments_json": json.dumps(podcast_audio.segments),
+    "_run_id": _run_id,
     "_pipeline_run_at": datetime.now(timezone.utc).isoformat(),
 }
 
 df_episode = spark.createDataFrame([episode_row])
 (
-    df_episode.write
-              .format("delta")
-              .mode("append")
-              .option("mergeSchema", "true")
-              .saveAsTable("news_pipeline.daily_databricks_feed.audio_episodes")
+    df_episode.write.format("delta")
+    .mode("append")
+    .option("mergeSchema", "true")
+    .saveAsTable("news_pipeline.daily_databricks_feed.audio_episodes")
 )
 logger.info(f"Wrote episode metadata to Delta audio_episodes (run_id={_run_id})")
 
@@ -274,10 +301,18 @@ print(f"  - {metadata_file}")
 print("=" * 60)
 
 # Return results for workflow
-dbutils.notebook.exit(json.dumps({
-    "date": date_str,
-    "duration_seconds": podcast_audio.duration_seconds,
-    "file_size_bytes": podcast_audio.file_size_bytes,
-    "segment_count": len(podcast_audio.segments),
-    "audio_file": str(audio_file),
-})) if "dbutils" in dir() else None
+(
+    dbutils.notebook.exit(
+        json.dumps(
+            {
+                "date": date_str,
+                "duration_seconds": podcast_audio.duration_seconds,
+                "file_size_bytes": podcast_audio.file_size_bytes,
+                "segment_count": len(podcast_audio.segments),
+                "audio_file": str(audio_file),
+            }
+        )
+    )
+    if "dbutils" in dir()
+    else None
+)

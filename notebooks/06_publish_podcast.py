@@ -31,6 +31,24 @@ env_file = project_root / ".env"
 if env_file.exists():
     load_dotenv(str(env_file))
 
+_WIDGET_KEYS = [
+    "GCP_SERVICE_ACCOUNT_JSON",
+    "GROQ_API_KEY",
+    "CLAUDE_API_KEY",
+    "GOOGLE_API_KEY",
+    "REDDIT_CLIENT_ID",
+    "REDDIT_CLIENT_SECRET",
+    "YOUTUBE_API_KEY",
+    "GCS_BUCKET_NAME",
+    "AUDIO_BASE_URL",
+]
+for _k in _WIDGET_KEYS:
+    try:
+        _v = dbutils.widgets.getArgument(_k, "")
+        if _v:
+            os.environ[_k] = _v
+    except Exception:
+        pass
 secrets = SecretsManager()
 
 # COMMAND ----------
@@ -342,38 +360,45 @@ from pyspark.sql import SparkSession
 
 spark = SparkSession.builder.getOrCreate()
 
+
 def _get_run_id():
     try:
-        return dbutils.notebook.entry_point.getDbutils().notebook().getContext().tags().apply("jobRunId")
+        return (
+            dbutils.notebook.entry_point.getDbutils()
+            .notebook()
+            .getContext()
+            .tags()
+            .apply("jobRunId")
+        )
     except Exception:
         return f"local-{uuid.uuid4().hex[:8]}"
+
 
 _run_id = _get_run_id()
 
 spark.sql("CREATE SCHEMA IF NOT EXISTS news_pipeline.daily_databricks_feed")
 
 feed_row = {
-    "episode_date":           date_str,
-    "episode_guid":           episode.guid,
-    "episode_title":          episode.title,
-    "episode_number":         episode.episode_number,
-    "audio_url":              audio_url,
-    "duration_seconds":       episode.duration_seconds,
-    "feed_url":               feed_url,
+    "episode_date": date_str,
+    "episode_guid": episode.guid,
+    "episode_title": episode.title,
+    "episode_number": episode.episode_number,
+    "audio_url": audio_url,
+    "duration_seconds": episode.duration_seconds,
+    "feed_url": feed_url,
     "total_episodes_in_feed": len(feed.episodes),
-    "feed_xml_length":        len(rss_xml),
-    "gcs_uploaded":           bool(GCS_BUCKET and not DRY_RUN),
-    "_run_id":                _run_id,
-    "_pipeline_run_at":       datetime.now(timezone.utc).isoformat(),
+    "feed_xml_length": len(rss_xml),
+    "gcs_uploaded": bool(GCS_BUCKET and not DRY_RUN),
+    "_run_id": _run_id,
+    "_pipeline_run_at": datetime.now(timezone.utc).isoformat(),
 }
 
 df_feed = spark.createDataFrame([feed_row])
 (
-    df_feed.write
-           .format("delta")
-           .mode("append")
-           .option("mergeSchema", "true")
-           .saveAsTable("news_pipeline.daily_databricks_feed.podcast_feed_history")
+    df_feed.write.format("delta")
+    .mode("append")
+    .option("mergeSchema", "true")
+    .saveAsTable("news_pipeline.daily_databricks_feed.podcast_feed_history")
 )
 logger.info(f"Wrote feed history to Delta podcast_feed_history (run_id={_run_id})")
 
@@ -407,7 +432,8 @@ print("=" * 60)
 print("\n" + "=" * 60)
 print("NEXT STEPS FOR DISTRIBUTION")
 print("=" * 60)
-print("""
+print(
+    """
 To distribute your podcast:
 
 1. **Spotify for Podcasters** (https://podcasters.spotify.com)
@@ -427,14 +453,27 @@ To distribute your podcast:
    - Submit to: Overcast, Pocket Casts, etc.
 
 Your RSS feed URL: {feed_url}
-""".format(feed_url=feed_url if feed_url.startswith("http") else "Configure AUDIO_BASE_URL for public URL"))
+""".format(
+        feed_url=(
+            feed_url if feed_url.startswith("http") else "Configure AUDIO_BASE_URL for public URL"
+        )
+    )
+)
 print("=" * 60)
 
 # Return results for workflow
-dbutils.notebook.exit(json.dumps({
-    "date": date_str,
-    "episode_number": episode.episode_number,
-    "total_episodes": len(feed.episodes),
-    "audio_url": audio_url,
-    "feed_url": feed_url,
-})) if "dbutils" in dir() else None
+(
+    dbutils.notebook.exit(
+        json.dumps(
+            {
+                "date": date_str,
+                "episode_number": episode.episode_number,
+                "total_episodes": len(feed.episodes),
+                "audio_url": audio_url,
+                "feed_url": feed_url,
+            }
+        )
+    )
+    if "dbutils" in dir()
+    else None
+)

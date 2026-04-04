@@ -52,6 +52,24 @@ if env_file.exists():
     load_dotenv(str(env_file))
     logger.info("Loaded environment from .env file")
 
+_WIDGET_KEYS = [
+    "GCP_SERVICE_ACCOUNT_JSON",
+    "GROQ_API_KEY",
+    "CLAUDE_API_KEY",
+    "GOOGLE_API_KEY",
+    "REDDIT_CLIENT_ID",
+    "REDDIT_CLIENT_SECRET",
+    "YOUTUBE_API_KEY",
+    "GCS_BUCKET_NAME",
+    "AUDIO_BASE_URL",
+]
+for _k in _WIDGET_KEYS:
+    try:
+        _v = dbutils.widgets.getArgument(_k, "")
+        if _v:
+            os.environ[_k] = _v
+    except Exception:
+        pass
 secrets = SecretsManager()
 secrets.print_status()
 
@@ -79,18 +97,22 @@ dbutils.fs.mkdirs(DATA_PATH)
 
 # COMMAND ----------
 
+
 # Run tracking — same ID across all tasks in one Databricks job run
 def _get_run_id() -> str:
     try:
         return (
-            dbutils.notebook.entry_point
-                   .getDbutils().notebook().getContext()
-                   .tags().apply("jobRunId")
+            dbutils.notebook.entry_point.getDbutils()
+            .notebook()
+            .getContext()
+            .tags()
+            .apply("jobRunId")
         )
     except Exception:
         return f"local-{uuid.uuid4().hex[:8]}"
 
-_run_id          = _get_run_id()
+
+_run_id = _get_run_id()
 _pipeline_run_at = datetime.now(timezone.utc).isoformat()
 
 logger.info("Run ID: %s", _run_id)
@@ -141,85 +163,78 @@ streams = []  # list of (source_name, streaming_DataFrame)
 
 # ── Hacker News (public API — no credentials required) ───────────────────────
 hn_stream = (
-    spark.readStream
-         .format("hacker_news_news")
-         .option("days_back",         str(DAYS_BACK))
-         .option("min_points",        "5")
-         .option("limit",             "50")
-         .option("filter_databricks", "true")
-         .load()
+    spark.readStream.format("hacker_news_news")
+    .option("days_back", str(DAYS_BACK))
+    .option("min_points", "5")
+    .option("limit", "50")
+    .option("filter_databricks", "true")
+    .load()
 )
 streams.append(("hacker_news", hn_stream))
 logger.info("Built Hacker News stream")
 
 # ── RSS Feeds (blogs, Medium, arXiv newsletters — no credentials) ─────────────
 rss_stream = (
-    spark.readStream
-         .format("rss_news")
-         .option("days_back",         str(max(DAYS_BACK, 7)))
-         .option("limit",             "100")
-         .option("filter_databricks", "true")
-         .load()
+    spark.readStream.format("rss_news")
+    .option("days_back", str(max(DAYS_BACK, 7)))
+    .option("limit", "100")
+    .option("filter_databricks", "true")
+    .load()
 )
 streams.append(("rss_feeds", rss_stream))
 logger.info("Built RSS stream")
 
 # ── GitHub Releases (works without token; GITHUB_TOKEN gives 5000 req/hr) ────
 github_stream = (
-    spark.readStream
-         .format("github_releases_news")
-         .option("days_back",          str(max(DAYS_BACK, 7)))
-         .option("limit",              "50")
-         .option("include_prereleases","false")
-         .load()
+    spark.readStream.format("github_releases_news")
+    .option("days_back", str(max(DAYS_BACK, 7)))
+    .option("limit", "50")
+    .option("include_prereleases", "false")
+    .load()
 )
 streams.append(("github_releases", github_stream))
 logger.info("Built GitHub Releases stream")
 
 # ── Databricks Community Forum (public Discourse API — no credentials) ────────
 discourse_stream = (
-    spark.readStream
-         .format("discourse_news")
-         .option("days_back", str(DAYS_BACK))
-         .option("limit",     "50")
-         .load()
+    spark.readStream.format("discourse_news")
+    .option("days_back", str(DAYS_BACK))
+    .option("limit", "50")
+    .load()
 )
 streams.append(("databricks_community", discourse_stream))
 logger.info("Built Databricks Community stream")
 
 # ── Dev.to articles (public Forem API — no credentials) ───────────────────────
 devto_stream = (
-    spark.readStream
-         .format("devto_news")
-         .option("days_back",         str(DAYS_BACK))
-         .option("limit",             "50")
-         .option("filter_databricks", "true")
-         .load()
+    spark.readStream.format("devto_news")
+    .option("days_back", str(DAYS_BACK))
+    .option("limit", "50")
+    .option("filter_databricks", "true")
+    .load()
 )
 streams.append(("devto", devto_stream))
 logger.info("Built Dev.to stream")
 
 # ── PyPI Releases (public JSON API — no credentials) ──────────────────────────
 pypi_stream = (
-    spark.readStream
-         .format("pypi_releases_news")
-         .option("days_back", str(max(DAYS_BACK, 7)))
-         .option("limit",     "50")
-         .load()
+    spark.readStream.format("pypi_releases_news")
+    .option("days_back", str(max(DAYS_BACK, 7)))
+    .option("limit", "50")
+    .load()
 )
 streams.append(("pypi_releases", pypi_stream))
 logger.info("Built PyPI Releases stream")
 
 # ── Stack Overflow (300 req/day free; STACK_EXCHANGE_API_KEY → 10,000/day) ────
 so_stream = (
-    spark.readStream
-         .format("stackoverflow_news")
-         .option("days_back",         str(DAYS_BACK))
-         .option("limit",             "30")
-         .option("min_answers",       "1")
-         .option("min_score",         "2")
-         .option("filter_databricks", "true")
-         .load()
+    spark.readStream.format("stackoverflow_news")
+    .option("days_back", str(DAYS_BACK))
+    .option("limit", "30")
+    .option("min_answers", "1")
+    .option("min_score", "2")
+    .option("filter_databricks", "true")
+    .load()
 )
 streams.append(("stackoverflow", so_stream))
 logger.info("Built Stack Overflow stream")
@@ -227,13 +242,12 @@ logger.info("Built Stack Overflow stream")
 # ── Reddit (requires REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET) ────────────────
 if os.environ.get("REDDIT_CLIENT_ID"):
     reddit_stream = (
-        spark.readStream
-             .format("reddit_news")
-             .option("days_back",         str(DAYS_BACK))
-             .option("min_score",         "3")
-             .option("limit",             "50")
-             .option("filter_databricks", "true")
-             .load()
+        spark.readStream.format("reddit_news")
+        .option("days_back", str(DAYS_BACK))
+        .option("min_score", "3")
+        .option("limit", "50")
+        .option("filter_databricks", "true")
+        .load()
     )
     streams.append(("reddit", reddit_stream))
     logger.info("Built Reddit stream")
@@ -243,12 +257,11 @@ else:
 # ── YouTube (requires YOUTUBE_API_KEY; minimum 7-day lookback) ───────────────
 if os.environ.get("YOUTUBE_API_KEY"):
     youtube_stream = (
-        spark.readStream
-             .format("youtube_news")
-             .option("days_back",         str(max(DAYS_BACK, 7)))
-             .option("limit",             "30")
-             .option("filter_databricks", "true")
-             .load()
+        spark.readStream.format("youtube_news")
+        .option("days_back", str(max(DAYS_BACK, 7)))
+        .option("limit", "30")
+        .option("filter_databricks", "true")
+        .load()
     )
     streams.append(("youtube", youtube_stream))
     logger.info("Built YouTube stream")
@@ -268,10 +281,8 @@ for _, s in streams[1:]:
     unified = unified.union(s)
 
 # Attach run-level columns as literals so every row is traceable to this run
-all_stream = (
-    unified
-    .withColumn("_run_id",          F.lit(_run_id))
-    .withColumn("_pipeline_run_at", F.lit(_pipeline_run_at))
+all_stream = unified.withColumn("_run_id", F.lit(_run_id)).withColumn(
+    "_pipeline_run_at", F.lit(_pipeline_run_at)
 )
 
 logger.info(
@@ -290,13 +301,11 @@ logger.info(
 spark.sql("CREATE SCHEMA IF NOT EXISTS news_pipeline.daily_databricks_feed")
 
 query = (
-    all_stream
-    .writeStream
-    .format("delta")
+    all_stream.writeStream.format("delta")
     .outputMode("append")
     .option("checkpointLocation", CHECKPOINT_PATH)
-    .option("mergeSchema",        "true")
-    .trigger(availableNow=True)          # process all available data, then stop
+    .option("mergeSchema", "true")
+    .trigger(availableNow=True)  # process all available data, then stop
     .toTable("news_pipeline.daily_databricks_feed.bronze_raw_landing")
 )
 
@@ -315,9 +324,8 @@ logger.info("Streaming ingestion complete")
 # Notebooks 02–06 read from bronze_news_raw.json. We accumulate recent records
 # (up to DAYS_BACK + 1 days) so incremental runs stay fast while the file stays bounded.
 
-run_df = (
-    spark.table("news_pipeline.daily_databricks_feed.bronze_raw_landing")
-         .filter(F.col("_run_id") == _run_id)
+run_df = spark.table("news_pipeline.daily_databricks_feed.bronze_raw_landing").filter(
+    F.col("_run_id") == _run_id
 )
 
 new_records_count = run_df.count()
@@ -346,13 +354,12 @@ if bronze_file.exists():
 # Drop records older than (DAYS_BACK + 1) days to prevent unbounded growth
 cutoff = (datetime.now(timezone.utc) - timedelta(days=DAYS_BACK + 1)).isoformat()
 existing_records = [
-    r for r in existing_records
-    if str(r.get("fetched_at", "")).replace("Z", "+00:00") >= cutoff
+    r for r in existing_records if str(r.get("fetched_at", "")).replace("Z", "+00:00") >= cutoff
 ]
 
 existing_ids = {r["id"] for r in existing_records}
 new_for_json = [r for r in bronze_records if r["id"] not in existing_ids]
-all_records  = existing_records + new_for_json
+all_records = existing_records + new_for_json
 
 with open(bronze_file, "w") as f:
     json.dump(all_records, f, indent=2, default=str)
@@ -389,9 +396,17 @@ for source, count in sorted(source_counts.items(), key=lambda x: x[1], reverse=T
     print(f"  {source}: {count}")
 print("=" * 60)
 
-dbutils.notebook.exit(json.dumps({
-    "run_id":        _run_id,
-    "new_records":   new_records_count,
-    "total_records": len(all_records),
-    "sources":       source_counts,
-})) if "dbutils" in dir() else None
+(
+    dbutils.notebook.exit(
+        json.dumps(
+            {
+                "run_id": _run_id,
+                "new_records": new_records_count,
+                "total_records": len(all_records),
+                "sources": source_counts,
+            }
+        )
+    )
+    if "dbutils" in dir()
+    else None
+)

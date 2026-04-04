@@ -155,9 +155,27 @@ class SecretsManager:
         2. Databricks Secret Scope 'daily-podcast' (fallback for Premium workspaces)
         """
         try:
-            import IPython
+            dbutils = None
 
-            dbutils = IPython.get_ipython().user_ns.get("dbutils")
+            # Approach 1: IPython user namespace (classic clusters / interactive)
+            try:
+                import IPython
+
+                ip = IPython.get_ipython()
+                if ip is not None:
+                    dbutils = ip.user_ns.get("dbutils")
+            except Exception:
+                pass
+
+            # Approach 2: databricks.sdk.runtime (serverless / Spark Connect)
+            if dbutils is None:
+                try:
+                    from databricks.sdk.runtime import dbutils as _sdk_dbutils
+
+                    dbutils = _sdk_dbutils
+                except Exception:
+                    pass
+
             if dbutils is None:
                 return
 

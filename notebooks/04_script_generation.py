@@ -31,6 +31,24 @@ env_file = project_root / ".env"
 if env_file.exists():
     load_dotenv(str(env_file))
 
+_WIDGET_KEYS = [
+    "GCP_SERVICE_ACCOUNT_JSON",
+    "GROQ_API_KEY",
+    "CLAUDE_API_KEY",
+    "GOOGLE_API_KEY",
+    "REDDIT_CLIENT_ID",
+    "REDDIT_CLIENT_SECRET",
+    "YOUTUBE_API_KEY",
+    "GCS_BUCKET_NAME",
+    "AUDIO_BASE_URL",
+]
+for _k in _WIDGET_KEYS:
+    try:
+        _v = dbutils.widgets.getArgument(_k, "")
+        if _v:
+            os.environ[_k] = _v
+    except Exception:
+        pass
 secrets = SecretsManager()
 
 # COMMAND ----------
@@ -112,7 +130,9 @@ script = generator.generate_script(
 )
 
 logger.info(f"Generated script with {script.word_count} words")
-logger.info(f"Estimated duration: {script.estimated_duration_seconds // 60}:{script.estimated_duration_seconds % 60:02d}")
+logger.info(
+    f"Estimated duration: {script.estimated_duration_seconds // 60}:{script.estimated_duration_seconds % 60:02d}"
+)
 
 # COMMAND ----------
 
@@ -127,7 +147,9 @@ print("=" * 80)
 print(f"\nTitle: {script.title}")
 print(f"Date: {script.episode_date}")
 print(f"Word Count: {script.word_count}")
-print(f"Est. Duration: {script.estimated_duration_seconds // 60}:{script.estimated_duration_seconds % 60:02d}")
+print(
+    f"Est. Duration: {script.estimated_duration_seconds // 60}:{script.estimated_duration_seconds % 60:02d}"
+)
 print("\n" + "-" * 80)
 
 # Show intro
@@ -138,8 +160,8 @@ print(script.intro[:500] + "..." if len(script.intro) > 500 else script.intro)
 print("\n[STORIES]")
 for i, story in enumerate(script.stories[:2], 1):
     print(f"\n--- Story {i}: {story.get('title', 'Untitled')[:50]}... ---")
-    content = story.get('content', '')[:300]
-    print(content + "..." if len(story.get('content', '')) > 300 else content)
+    content = story.get("content", "")[:300]
+    print(content + "..." if len(story.get("content", "")) > 300 else content)
 
 if len(script.stories) > 2:
     print(f"\n... and {len(script.stories) - 2} more stories ...")
@@ -234,11 +256,19 @@ from pyspark.sql import SparkSession
 
 spark = SparkSession.builder.getOrCreate()
 
+
 def _get_run_id():
     try:
-        return dbutils.notebook.entry_point.getDbutils().notebook().getContext().tags().apply("jobRunId")
+        return (
+            dbutils.notebook.entry_point.getDbutils()
+            .notebook()
+            .getContext()
+            .tags()
+            .apply("jobRunId")
+        )
     except Exception:
         return f"local-{uuid.uuid4().hex[:8]}"
+
 
 _run_id = _get_run_id()
 
@@ -247,27 +277,26 @@ spark.sql("CREATE SCHEMA IF NOT EXISTS news_pipeline.daily_databricks_feed")
 script_dict = script.to_dict()
 
 script_row = {
-    "episode_date":        date_str,
-    "title":               script_dict.get("title", ""),
-    "word_count":          int(script_dict.get("word_count", 0) or 0),
-    "duration_seconds":    int(script_dict.get("estimated_duration_seconds", 0) or 0),
-    "intro":               script_dict.get("intro", ""),
-    "outro":               script_dict.get("outro", ""),
-    "stories_json":        json.dumps(script_dict.get("stories", [])),
-    "story_count":         len(script_dict.get("stories", [])),
-    "ssml_length":         len(ssml_script),
-    "provider":            script_dict.get("metadata", {}).get("provider", "unknown"),
-    "_run_id":             _run_id,
-    "_pipeline_run_at":    datetime.now(timezone.utc).isoformat(),
+    "episode_date": date_str,
+    "title": script_dict.get("title", ""),
+    "word_count": int(script_dict.get("word_count", 0) or 0),
+    "duration_seconds": int(script_dict.get("estimated_duration_seconds", 0) or 0),
+    "intro": script_dict.get("intro", ""),
+    "outro": script_dict.get("outro", ""),
+    "stories_json": json.dumps(script_dict.get("stories", [])),
+    "story_count": len(script_dict.get("stories", [])),
+    "ssml_length": len(ssml_script),
+    "provider": script_dict.get("metadata", {}).get("provider", "unknown"),
+    "_run_id": _run_id,
+    "_pipeline_run_at": datetime.now(timezone.utc).isoformat(),
 }
 
 df_script = spark.createDataFrame([script_row])
 (
-    df_script.write
-             .format("delta")
-             .mode("append")
-             .option("mergeSchema", "true")
-             .saveAsTable("news_pipeline.daily_databricks_feed.podcast_scripts")
+    df_script.write.format("delta")
+    .mode("append")
+    .option("mergeSchema", "true")
+    .saveAsTable("news_pipeline.daily_databricks_feed.podcast_scripts")
 )
 logger.info(f"Wrote script metadata to Delta podcast_scripts (run_id={_run_id})")
 
@@ -285,7 +314,9 @@ print("=" * 60)
 print(f"Date: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
 print(f"Episode: {script.title}")
 print(f"Word count: {script.word_count}")
-print(f"Duration: {script.estimated_duration_seconds // 60}:{script.estimated_duration_seconds % 60:02d}")
+print(
+    f"Duration: {script.estimated_duration_seconds // 60}:{script.estimated_duration_seconds % 60:02d}"
+)
 print(f"Stories: {len(script.stories)}")
 print(f"Provider: {script.metadata.get('provider', 'Unknown')}")
 print(f"\nOutput files:")
@@ -294,10 +325,18 @@ print(f"  - {ssml_output_file}")
 print("=" * 60)
 
 # Return results for workflow
-dbutils.notebook.exit(json.dumps({
-    "date": date_str,
-    "word_count": script.word_count,
-    "duration_seconds": script.estimated_duration_seconds,
-    "story_count": len(script.stories),
-    "provider": script.metadata.get("provider", "Unknown"),
-})) if "dbutils" in dir() else None
+(
+    dbutils.notebook.exit(
+        json.dumps(
+            {
+                "date": date_str,
+                "word_count": script.word_count,
+                "duration_seconds": script.estimated_duration_seconds,
+                "story_count": len(script.stories),
+                "provider": script.metadata.get("provider", "Unknown"),
+            }
+        )
+    )
+    if "dbutils" in dir()
+    else None
+)
