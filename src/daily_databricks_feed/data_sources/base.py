@@ -10,6 +10,45 @@ from functools import wraps
 
 logger = logging.getLogger(__name__)
 
+# Single source of truth for all keyword filtering across the pipeline.
+# Used by BaseDataSource (Bronze filter) and BronzeToSilverTransformer (Silver keywords).
+DATABRICKS_KEYWORDS = [
+    # Databricks platform — core
+    "databricks", "delta lake", "delta-lake", "deltalake", "apache spark",
+    "lakehouse", "mlflow", "unity catalog", "databricks sql", "delta sharing",
+    "lakeflow", "photon", "medallion architecture", "dbx",
+    # Pipelines — old and new nomenclature
+    "delta live tables", "dlt", "lakeflow pipelines",
+    "spark declarative pipelines", "sdp", "declarative pipelines", "serverless dlt",
+    # Bundles — old and new nomenclature
+    "databricks asset bundle", "dab", "databricks automation bundle",
+    "declarative automation bundle", "declarative automation", "bundle deploy",
+    # Latest releases
+    "lakebase", "lakebridge", "databricks apps", "databricks connect",
+    "databricks serverless", "databricks workflows", "databricks marketplace",
+    "databricks partner connect",
+    # Vector search & AI infrastructure
+    "databricks vector search", "mosaic vector search", "ai functions",
+    "databricks model serving", "databricks playground", "dbrx",
+    # Migration & databases
+    "databricks migration", "warehouse migration", "sql migration",
+    "postgres", "postgresql", "managed postgres", "oltp",
+    # Open table formats
+    "apache iceberg", "iceberg", "apache hudi", "hudi", "apache paimon",
+    "open table format",
+    # AI / LLM
+    "large language model", "llm", "generative ai", "gen ai",
+    "claude", "anthropic", "gpt", "openai", "llama", "mistral", "hugging face",
+    "rag", "retrieval augmented", "vector search", "embedding", "fine-tuning",
+    "mosaic ai", "ai gateway",
+    # Cloud data services
+    "azure synapse", "azure data factory", "microsoft fabric", "fabric lakehouse",
+    "synapse analytics", "aws glue", "amazon redshift", "bigquery", "snowflake",
+    # Data engineering ecosystem
+    "dbt", "apache kafka", "apache flink", "data engineering", "data lakehouse",
+    "data mesh", "data catalog", "data governance",
+]
+
 
 @dataclass
 class NewsItem:
@@ -98,110 +137,8 @@ class BaseDataSource(ABC):
     SOURCE_NAME = "base"
     DEFAULT_RATE_LIMIT = 1.0  # requests per second
 
-    # Keywords to filter for relevant content
-    DATABRICKS_KEYWORDS = [
-        # Databricks platform — core
-        "databricks",
-        "delta lake",
-        "delta-lake",
-        "deltalake",
-        "apache spark",
-        "lakehouse",
-        "mlflow",
-        "unity catalog",
-        "databricks sql",
-        "delta sharing",
-        "delta live tables",
-        "lakeflow",
-        "photon",
-        "medallion architecture",
-        "dbx",
-        # Databricks latest releases
-        "lakebase",
-        "lakebridge",
-        "databricks apps",
-        "databricks connect",
-        "databricks serverless",
-        "databricks workflows",
-        "databricks marketplace",
-        "databricks partner connect",
-        # Pipelines — old and new nomenclature
-        "delta live tables",
-        "dlt",
-        "lakeflow pipelines",
-        "spark declarative pipelines",
-        "sdp",
-        "declarative pipelines",
-        "serverless dlt",
-        # Bundles — old and new nomenclature
-        "databricks asset bundle",
-        "dab",
-        "databricks automation bundle",
-        "declarative automation bundle",
-        "declarative automation",
-        "bundle deploy",
-        # Vector search & AI infrastructure
-        "databricks vector search",
-        "mosaic vector search",
-        "ai functions",
-        "databricks model serving",
-        "databricks playground",
-        "dbrx",
-        # Migration & databases
-        "lakebridge",
-        "databricks migration",
-        "warehouse migration",
-        "sql migration",
-        "postgres",
-        "postgresql",
-        "managed postgres",
-        "oltp",
-        # Open table formats
-        "apache iceberg",
-        "iceberg",
-        "apache hudi",
-        "hudi",
-        "apache paimon",
-        "open table format",
-        # AI / LLM
-        "large language model",
-        "llm",
-        "generative ai",
-        "gen ai",
-        "claude",
-        "anthropic",
-        "gpt",
-        "openai",
-        "llama",
-        "mistral",
-        "hugging face",
-        "rag",
-        "retrieval augmented",
-        "vector search",
-        "embedding",
-        "fine-tuning",
-        "mosaic ai",
-        "ai gateway",
-        # Cloud data services
-        "azure synapse",
-        "azure data factory",
-        "microsoft fabric",
-        "fabric lakehouse",
-        "synapse analytics",
-        "aws glue",
-        "amazon redshift",
-        "bigquery",
-        "snowflake",
-        # Data engineering ecosystem
-        "dbt",
-        "apache kafka",
-        "apache flink",
-        "data engineering",
-        "data lakehouse",
-        "data mesh",
-        "data catalog",
-        "data governance",
-    ]
+    # Reference module-level constant — single source of truth
+    DATABRICKS_KEYWORDS = DATABRICKS_KEYWORDS
 
     def __init__(
         self,

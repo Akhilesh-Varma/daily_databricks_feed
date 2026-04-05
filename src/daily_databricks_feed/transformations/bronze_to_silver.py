@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional, Set
 from dataclasses import dataclass, field
 
-from ..data_sources.base import NewsItem
+from ..data_sources.base import NewsItem, DATABRICKS_KEYWORDS
 
 
 @dataclass
@@ -331,43 +331,8 @@ class BronzeToSilverTransformer:
 
         text_lower = text.lower()
 
-        # Keywords related to Databricks ecosystem (kept in sync with base.py DATABRICKS_KEYWORDS)
-        keyword_list = [
-            # Databricks platform — core
-            "databricks", "delta lake", "apache spark", "spark", "mlflow",
-            "unity catalog", "photon", "delta sharing", "lakehouse", "medallion",
-            # Pipelines — old and new nomenclature
-            "delta live tables", "dlt", "lakeflow pipelines",
-            "spark declarative pipelines", "sdp", "declarative pipelines", "serverless dlt",
-            # Bundles — old and new nomenclature
-            "databricks asset bundle", "dab", "databricks automation bundle",
-            "declarative automation bundle", "declarative automation",
-            # Latest releases
-            "lakebase", "lakebridge", "databricks apps", "databricks connect",
-            "databricks serverless", "databricks workflows", "databricks marketplace",
-            "databricks vector search", "mosaic vector search", "ai functions",
-            "databricks model serving", "dbrx",
-            # Migration & databases
-            "databricks migration", "warehouse migration", "postgres", "postgresql", "oltp",
-            # Open table formats
-            "apache iceberg", "iceberg", "apache hudi", "hudi", "apache paimon",
-            # AI / LLM
-            "large language model", "llm", "generative ai", "gen ai",
-            "claude", "anthropic", "gpt", "openai", "llama", "mistral",
-            "rag", "retrieval augmented", "vector search", "embedding", "fine-tuning",
-            "mosaic ai", "ai gateway",
-            # Cloud data services
-            "azure synapse", "azure data factory", "microsoft fabric",
-            "aws glue", "amazon redshift", "bigquery", "snowflake",
-            # Data engineering ecosystem
-            "dbt", "apache kafka", "apache flink", "data mesh", "data governance",
-            "data engineering", "data science", "machine learning", "ml", "ai",
-            "etl", "elt", "streaming", "batch", "sql", "python", "scala",
-            "notebook", "cluster", "workflow", "pipeline",
-        ]
-
         found = []
-        for keyword in keyword_list:
+        for keyword in DATABRICKS_KEYWORDS:
             if keyword in text_lower:
                 # Normalize similar keywords
                 normalized = keyword.replace("-", " ").replace("_", " ")
