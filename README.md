@@ -60,6 +60,22 @@ daily_databricks_feed/
 
 Reddit and YouTube are optional — the pipeline runs with 7 sources if those credentials are missing.
 
+### What each source fetches
+
+| Source | Fields fetched | What becomes `content` |
+|--------|---------------|------------------------|
+| Hacker News | Title, URL, score, comment count | Story text or linked article excerpt |
+| Reddit | Title, selftext, score, comment count | Post body text |
+| **YouTube** | Title, description, view/like/comment counts | **Video description only — no transcript** |
+| RSS Feeds | Title, summary, published date | Article summary / first paragraphs |
+| GitHub Releases | Tag name, release notes, published date | Release notes body |
+| PyPI | Package name, version, release date | Package description |
+| Stack Overflow | Question title, body, tags, vote count | Question body |
+| Dev.to | Title, description, tags, reactions | Article description |
+| Databricks Community | Topic title, excerpt, reply/view counts | Post excerpt |
+
+> **YouTube limitation**: The YouTube Data API v3 does not provide video transcripts. Only the title and description box are available. To ingest full transcripts, `youtube-transcript-api` would need to be added as a separate enrichment step.
+
 ### Fetch timeline
 
 Each source has two modes that determine how far back it looks:
@@ -98,6 +114,55 @@ Keywords cover:
 - **AI / LLM**: claude, anthropic, gpt, llama, mistral, rag, embeddings, fine-tuning, mosaic AI
 - **Cloud data services**: Azure Synapse, Microsoft Fabric, AWS Glue, BigQuery, Snowflake
 - **Data ecosystem**: dbt, Apache Kafka, Apache Flink, data mesh, data governance
+
+## Story Selection & Scoring
+
+### How sources are combined
+
+There is no traditional join. Every source outputs records with the same flat schema (`id`, `source`, `title`, `url`, `content`, `score`, `comments_count`, `published_at`). All 9 sources are merged into a single flat list, written to the `bronze_raw_landing` Delta table, and processed identically through the Silver and Gold layers.
+
+### Quality score
+
+Each record is assigned a `quality_score` (0.0–1.0) in the Silver layer. This is the primary sort key used to select the top stories.
+
+| Component | Max | How it's calculated |
+|-----------|-----|---------------------|
+| Title length | 0.20 | +0.1 if >20 chars, +0.1 if >50 chars |
+| Content length | 0.20 | +0.1 if >100 chars, +0.1 if >500 chars |
+| Keyword density | 0.20 | `min(keyword_count / 5, 1.0) × 0.2` |
+| Social proof | 0.20 | Log scale of upvotes + comments |
+| Source credibility | 0.20 | Hard-coded per source (see below) |
+
+### Source credibility (implicit priority order)
+
+| Source | Credibility score | Why |
+|--------|------------------|-----|
+| RSS Feeds (official blogs) | **0.20** | Primary announcements from Databricks, Delta, MLflow |
+| Hacker News | 0.15 | High-quality community curation |
+| YouTube | 0.15 | Official tutorials and announcements |
+| Reddit | 0.10 | Community discussion |
+| All others (PyPI, GitHub, Stack Overflow, Dev.to, Discourse) | 0.10 | Supplementary signals |
+
+A highly upvoted Reddit post can still outscore a low-engagement blog post via social proof — the credibility score is a starting advantage, not a ceiling.
+
+### Diversity penalty
+
+After scoring, `select_top_stories()` applies a diversity penalty of `0.3 × times_source_already_selected` to prevent one source from dominating all slots. A story's effective score is:
+
+```
+effective_score = quality_score − (0.3 × times_source_already_picked)
+```
+
+A story is included if `effective_score > 0.2`, or until at least `max_stories / 2` slots are filled (guarantees content on slow news days).
+
+### Podcast flow ordering
+
+Selected stories are reordered before being sent to the LLM for a natural podcast flow:
+
+1. **Releases** — GitHub releases, PyPI packages
+2. **Official content** — RSS blog posts
+3. **Community discussion** — Hacker News, Reddit, Stack Overflow, Databricks Community
+4. **Tutorials & video** — Dev.to, YouTube
 
 ## LLM Providers
 
