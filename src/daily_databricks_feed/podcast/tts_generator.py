@@ -41,24 +41,25 @@ class VoiceConfig:
 
 
 # Pre-configured voices for the podcast
+# Using Standard voices (free tier: 4M chars/month)
 VOICES = {
     "female_host": VoiceConfig(
-        name="en-US-Neural2-F",
+        name="en-US-Standard-F",
         language_code="en-US",
         ssml_gender="FEMALE",
     ),
     "male_host": VoiceConfig(
-        name="en-US-Neural2-D",
+        name="en-US-Standard-D",
         language_code="en-US",
         ssml_gender="MALE",
     ),
     "female_casual": VoiceConfig(
-        name="en-US-Casual-K",
+        name="en-US-Standard-C",
         language_code="en-US",
         ssml_gender="FEMALE",
     ),
     "male_casual": VoiceConfig(
-        name="en-US-Journey-D",
+        name="en-US-Standard-B",
         language_code="en-US",
         ssml_gender="MALE",
     ),

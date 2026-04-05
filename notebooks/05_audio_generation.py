@@ -67,6 +67,7 @@ for _k in _WIDGET_KEYS:
         except Exception:
             pass
 secrets = SecretsManager()
+secrets.print_status()  # TODO: remove after verifying GCP credentials are loaded
 
 # COMMAND ----------
 
