@@ -100,7 +100,7 @@ class BaseDataSource(ABC):
 
     # Keywords to filter for relevant content
     DATABRICKS_KEYWORDS = [
-        # Databricks platform
+        # Databricks platform — core
         "databricks",
         "delta lake",
         "delta-lake",
@@ -116,6 +116,34 @@ class BaseDataSource(ABC):
         "photon",
         "medallion architecture",
         "dbx",
+        # Databricks latest releases
+        "lakebase",
+        "lakebridge",
+        "databricks apps",
+        "databricks connect",
+        "databricks serverless",
+        "databricks asset bundle",
+        "databricks workflows",
+        "databricks marketplace",
+        "databricks partner connect",
+        "declarative pipelines",
+        "serverless dlt",
+        # Vector search & AI infrastructure
+        "databricks vector search",
+        "mosaic vector search",
+        "ai functions",
+        "databricks model serving",
+        "databricks playground",
+        "dbrx",
+        # Migration & databases
+        "lakebridge",
+        "databricks migration",
+        "warehouse migration",
+        "sql migration",
+        "postgres",
+        "postgresql",
+        "managed postgres",
+        "oltp",
         # Open table formats
         "apache iceberg",
         "iceberg",
