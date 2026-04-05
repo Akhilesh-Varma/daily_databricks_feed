@@ -60,12 +60,38 @@ daily_databricks_feed/
 
 Reddit and YouTube are optional — the pipeline runs with 7 sources if those credentials are missing.
 
+### Fetch timeline
+
+Each source has two modes that determine how far back it looks:
+
+**Mode 1 — Incremental (normal daily runs)**
+Spark Structured Streaming passes the exact Unix timestamp of the last checkpoint to each source. Only content published after that point is fetched — no duplicates, no gaps.
+
+**Mode 2 — Backfill (first run or after checkpoint reset)**
+When no checkpoint exists, each source falls back to a fixed `days_back` window. This is also overridable at runtime via `--params days_back=7`.
+
+| Source | Default `days_back` | Rationale |
+|--------|-------------------|-----------|
+| Hacker News | 1 day | High volume — daily cadence is sufficient |
+| Reddit | 1 day | Active community, posts age quickly |
+| YouTube | 7 days | Videos published less frequently |
+| RSS Feeds | 7 days | Blog posts are infrequent |
+| GitHub Releases | 7 days | Releases don't happen daily |
+| PyPI | 7 days | Package releases are infrequent |
+| Stack Overflow | 1 day | High question volume |
+| Dev.to | 1 day | Active daily publishing |
+| Databricks Community | 1 day | Forum is high-traffic |
+
+> After deleting the checkpoint or on first run, use `--params days_back=7` to backfill a full week across all sources.
+
 ### Keyword filter
 
-All sources that pull from general feeds (Hacker News, Reddit, YouTube, Dev.to) run every item through a ~80-keyword filter before passing it downstream. Keywords cover:
+Sources pulling from general feeds (Hacker News, Reddit, YouTube, Dev.to) run every item through an ~80-keyword filter before passing it downstream. Curated sources (RSS, GitHub, PyPI, Discourse, Stack Overflow by tag) skip this filter as they are already on-topic.
+
+Keywords cover:
 
 - **Databricks platform**: delta lake, unity catalog, mlflow, lakeflow, photon, medallion architecture
-- **Pipelines**: delta live tables (DLT), lakeflow pipelines, spark declarative pipelines (SDP), serverless DLT
+- **Pipelines**: delta live tables (DLT), lakeflow pipelines, spark declarative pipelines (SDP), serverless DLT, declarative pipelines
 - **Bundles**: databricks asset bundle (DAB), databricks automation bundle, declarative automation bundle
 - **Latest releases**: lakebase, lakebridge, databricks apps, databricks connect, model serving, DBRX, AI functions, vector search
 - **Open table formats**: Apache Iceberg, Apache Hudi, Apache Paimon
@@ -75,12 +101,14 @@ All sources that pull from general feeds (Hacker News, Reddit, YouTube, Dev.to) 
 
 ## LLM Providers
 
-| Provider | Free tier | Model used |
-|----------|-----------|------------|
-| **Groq** (recommended) | 14,400 req/day | Llama 3.1 70B |
-| Anthropic Claude | Limited | Claude 3 Haiku |
-| Google Gemini | 60 req/min | Gemini 1.5 Flash |
-| Template fallback | Unlimited | Rule-based (no API needed) |
+Providers are tried in order — first available one is used.
+
+| Priority | Provider | Model | Free tier |
+|----------|----------|-------|-----------|
+| 1 | **Anthropic Claude** (primary) | claude-sonnet-4-6 | Limited free tier |
+| 2 | Groq | Llama 3.1 70B | 14,400 req/day |
+| 3 | Google Gemini | Gemini 1.5 Flash | 60 req/min |
+| 4 | Template fallback | Rule-based | Unlimited (no API needed) |
 
 ## Voice Configuration
 
