@@ -316,6 +316,33 @@ class ScriptGenerator:
         "youtube": "Mention this as a video resource worth watching for a deeper dive.",
     }
 
+    # Maps URL domains to listener-friendly publication names
+    RSS_DOMAIN_LABELS = {
+        "databricks.com": "the Databricks engineering blog",
+        "delta.io": "the Delta Lake blog",
+        "mlflow.org": "the MLflow blog",
+        "spark.apache.org": "the Apache Spark blog",
+        "medium.com": "Medium",
+        "towardsdatascience.com": "Towards Data Science",
+        "substack.com": "Substack",
+        "github.io": "GitHub Pages",
+    }
+
+    @staticmethod
+    def _url_to_publication(url: str) -> str:
+        """Resolve a URL to a listener-friendly publication name."""
+        import re as _re
+        match = _re.search(r"https?://(?:www\.)?([^/]+)", url or "")
+        if not match:
+            return "an online article"
+        domain = match.group(1).lower()
+        for key, label in ScriptGenerator.RSS_DOMAIN_LABELS.items():
+            if key in domain:
+                return label
+        # Fallback: capitalise the domain root (e.g. "venturebeat.com" → "VentureBeat")
+        root = domain.split(".")[0]
+        return root.capitalize()
+
     def _build_prompt(self, stories: List[Dict[str, Any]], date_str: str, podcast_name: str) -> str:
         """Build a source-aware prompt for richer podcast script generation."""
         stories_text = ""
@@ -324,16 +351,20 @@ class ScriptGenerator:
             label, emoji = self.SOURCE_LABELS.get(source, ("News", "📌"))
             treatment = self.SOURCE_TREATMENT.get(source, "Cover this as a general news item.")
 
+            # Resolve publication name for RSS stories so Claude can name the source naturally
+            url = story.get("url", "")
+            if source == "rss_feed":
+                publication = self._url_to_publication(url)
+                treatment += f' Mention it comes from {publication} (e.g. "over on {publication}...").'
+
             stories_text += f"""
 Story {i} [{emoji} {label}]:
 Title: {story.get('title', 'Untitled')}
-Source: {source}
+Source type: {source}
 Summary: {story.get('content', story.get('title', ''))[:500]}
 Podcast treatment hint: {treatment}
----
 """
 
-        # Identify if there are any official releases today for special framing
         release_sources = {"github_releases", "pypi_releases"}
         has_releases = any(s.get("source") in release_sources for s in stories[:10])
         release_tease = (
@@ -344,47 +375,55 @@ Podcast treatment hint: {treatment}
 
 The podcast should be approximately {self.TARGET_WORD_COUNT} words (about 5-6 minutes when read aloud).
 
-Today's content comes from 9 different sources: official Databricks & OSS project blogs,
-GitHub release announcements, PyPI package updates, Hacker News, Reddit, Stack Overflow,
-Dev.to tutorials, the Databricks Community Forum, and YouTube.{release_tease}
+Today's content comes from official Databricks and OSS project blogs, GitHub releases, PyPI,
+Hacker News, Reddit, Stack Overflow, Dev.to, the Databricks Community Forum, and YouTube.{release_tease}
 
 Here are today's top stories:
 
 {stories_text}
 
-Please write a complete, engaging podcast script with these sections:
+Write the script using these section markers (used for parsing — do NOT include them in the spoken text):
 
-1. **[INTRO]** (3-4 sentences):
-   - Warm welcome and date
-   - Set context: "Today we're covering everything from official announcements to what
-     the community is building and asking about"
-   - Tease 1-2 of the most exciting stories
+[INTRO]
+<intro text here>
 
-2. **[STORY N: Title]** for each story (one per story, covering 5-7 stories):
-   - Use the "Podcast treatment hint" to frame each story appropriately
-   - For releases: lead with "Big news — version X of Y just dropped..."
-   - For community content: lead with "The community has been buzzing about..."
-   - For tutorials: lead with "If you want to learn..."
-   - For Q&A/Stack Overflow: lead with "A common question practitioners are hitting is..."
-   - Keep each story to 3-5 sentences — enough to be informative, not exhausting
-   - End each story with a brief "why it matters" or "what to do next" sentence
+[STORY 1: Story Title]
+<story text here>
 
-3. **[OUTRO]** (3-4 sentences):
-   - Thank listeners
-   - Remind them of the breadth of sources ("from official release notes to community discussions")
-   - Call to action: subscribe, follow along, check the show notes for links
-   - Warm sign-off
+[STORY 2: Story Title]
+<story text here>
 
-Important guidelines:
-- Conversational, audio-first language — no markdown, no bullet points in the script itself
-- Natural transitions between stories ("Speaking of releases...", "On a more community note...",
-  "Switching gears to the developer side...")
-- Group related stories together where natural (e.g. two releases back-to-back)
-- Add personality: a touch of excitement for big releases, empathy for tricky SO questions
-- Vary sentence length for rhythm — mix short punchy sentences with longer explanations
-- Avoid reading raw URLs; say "check the show notes" instead
+[OUTRO]
+<outro text here>
+
+Guidelines:
+- CRITICAL: Plain spoken text only. No markdown (no **, no --, no ##, no bullet points, no dashes as separators).
+- CRITICAL: No \\n escape sequences. Write natural paragraph breaks only.
+- Conversational, audio-first language — this will be read aloud by a text-to-speech engine.
+- For each RSS story, naturally mention the publication it comes from (e.g. "over on the Databricks blog...", "a new piece on Medium...").
+- Natural transitions between stories ("Speaking of releases...", "On a more community note...", "Switching gears...")
+- Add personality: excitement for big releases, empathy for tricky questions
+- Vary sentence length for rhythm
+- Never read raw URLs — say "check the show notes" instead
 """
         return prompt
+
+    @staticmethod
+    def _clean_for_tts(text: str) -> str:
+        """Strip markdown and formatting artifacts that TTS engines read literally."""
+        import re as _re
+        # Remove markdown bold/italic markers
+        text = text.replace("**", "").replace("__", "").replace("*", "").replace("_", " ")
+        # Remove horizontal rules
+        text = _re.sub(r"-{2,}", "", text)
+        # Remove markdown headings
+        text = _re.sub(r"^#{1,6}\s+", "", text, flags=_re.MULTILINE)
+        # Remove section markers like [INTRO], [STORY 1: ...], [OUTRO]
+        text = _re.sub(r"\[[A-Z][^\]]*\]", "", text)
+        # Collapse multiple blank lines into one
+        text = _re.sub(r"\n{3,}", "\n\n", text)
+        # Remove leading/trailing whitespace
+        return text.strip()
 
     def _parse_script(
         self, raw_script: str, original_stories: List[Dict[str, Any]]
@@ -404,7 +443,7 @@ Important guidelines:
             r"\[INTRO\](.*?)(?=\[STORY|\[OUTRO|$)", raw_script, re.DOTALL | re.IGNORECASE
         )
         if intro_match:
-            result["intro"] = intro_match.group(1).strip()
+            result["intro"] = self._clean_for_tts(intro_match.group(1))
 
         # Try to extract stories
         story_pattern = r"\[STORY\s*\d*:?\s*(.*?)\](.*?)(?=\[STORY|\[OUTRO|$)"
@@ -418,8 +457,8 @@ Important guidelines:
 
             result["stories"].append(
                 {
-                    "title": title.strip() or f"Story {i + 1}",
-                    "content": content.strip(),
+                    "title": self._clean_for_tts(title) or f"Story {i + 1}",
+                    "content": self._clean_for_tts(content),
                     "source": source,
                 }
             )
@@ -427,12 +466,16 @@ Important guidelines:
         # Try to extract outro
         outro_match = re.search(r"\[OUTRO\](.*?)$", raw_script, re.DOTALL | re.IGNORECASE)
         if outro_match:
-            result["outro"] = outro_match.group(1).strip()
+            result["outro"] = self._clean_for_tts(outro_match.group(1))
 
-        # If parsing failed, use the whole script
+        # If parsing failed, use the whole script cleaned
         if not result["intro"] and not result["stories"]:
-            result["intro"] = raw_script[:500]
-            result["outro"] = raw_script[-300:]
+            cleaned = self._clean_for_tts(raw_script)
+            result["intro"] = cleaned[:500]
+            result["outro"] = cleaned[-300:]
+
+        # Always clean the full script stored for reference
+        result["full_script"] = self._clean_for_tts(raw_script)
 
         return result
 
