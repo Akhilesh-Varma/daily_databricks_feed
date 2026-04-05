@@ -115,3 +115,7 @@ audio_metadata_*.json
 .claude/
 .ai-dev-kit/
 .github/skills/
+
+# MCP config
+.mcp.json
+.mcp.json.bak
