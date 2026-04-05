@@ -256,33 +256,37 @@ streams.append(("stackoverflow", so_stream))
 logger.info("Built Stack Overflow stream")
 
 # ── Reddit (requires REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET) ────────────────
+# Always included to keep checkpoint source count stable at 9.
+# RedditStreamReader.is_available() returns zero items when credentials are missing.
+reddit_stream = (
+    spark.readStream.format("reddit_news")
+    .option("days_back", str(DAYS_BACK))
+    .option("min_score", "3")
+    .option("limit", "50")
+    .option("filter_databricks", "true")
+    .load()
+)
+streams.append(("reddit", reddit_stream))
 if os.environ.get("REDDIT_CLIENT_ID"):
-    reddit_stream = (
-        spark.readStream.format("reddit_news")
-        .option("days_back", str(DAYS_BACK))
-        .option("min_score", "3")
-        .option("limit", "50")
-        .option("filter_databricks", "true")
-        .load()
-    )
-    streams.append(("reddit", reddit_stream))
     logger.info("Built Reddit stream")
 else:
-    logger.warning("REDDIT_CLIENT_ID not set — Reddit stream skipped")
+    logger.warning("REDDIT_CLIENT_ID not set — Reddit stream included but will yield 0 items")
 
 # ── YouTube (requires YOUTUBE_API_KEY; minimum 7-day lookback) ───────────────
+# Always included to keep checkpoint source count stable at 9.
+# YouTubeStreamReader.is_available() returns zero items when credentials are missing.
+youtube_stream = (
+    spark.readStream.format("youtube_news")
+    .option("days_back", str(max(DAYS_BACK, 7)))
+    .option("limit", "30")
+    .option("filter_databricks", "true")
+    .load()
+)
+streams.append(("youtube", youtube_stream))
 if os.environ.get("YOUTUBE_API_KEY"):
-    youtube_stream = (
-        spark.readStream.format("youtube_news")
-        .option("days_back", str(max(DAYS_BACK, 7)))
-        .option("limit", "30")
-        .option("filter_databricks", "true")
-        .load()
-    )
-    streams.append(("youtube", youtube_stream))
     logger.info("Built YouTube stream")
 else:
-    logger.warning("YOUTUBE_API_KEY not set — YouTube stream skipped")
+    logger.warning("YOUTUBE_API_KEY not set — YouTube stream included but will yield 0 items")
 
 # COMMAND ----------
 
