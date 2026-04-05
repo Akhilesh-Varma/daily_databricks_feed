@@ -64,7 +64,9 @@ Reddit and YouTube are optional — the pipeline runs with 7 sources if those cr
 
 All sources that pull from general feeds (Hacker News, Reddit, YouTube, Dev.to) run every item through a ~80-keyword filter before passing it downstream. Keywords cover:
 
-- **Databricks platform**: delta lake, unity catalog, mlflow, lakeflow, photon, medallion architecture, serverless DLT, declarative pipelines, asset bundles
+- **Databricks platform**: delta lake, unity catalog, mlflow, lakeflow, photon, medallion architecture
+- **Pipelines**: delta live tables (DLT), lakeflow pipelines, spark declarative pipelines (SDP), serverless DLT
+- **Bundles**: databricks asset bundle (DAB), databricks automation bundle, declarative automation bundle
 - **Latest releases**: lakebase, lakebridge, databricks apps, databricks connect, model serving, DBRX, AI functions, vector search
 - **Open table formats**: Apache Iceberg, Apache Hudi, Apache Paimon
 - **AI / LLM**: claude, anthropic, gpt, llama, mistral, rag, embeddings, fine-tuning, mosaic AI
