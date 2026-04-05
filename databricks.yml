@@ -20,6 +20,14 @@ variables:
     description: "Name of the podcast"
     default: "Daily Databricks Digest"
 
+  podcast_author:
+    description: "Podcast author name shown in podcast apps"
+    default: "Daily Databricks Team"
+
+  podcast_email:
+    description: "Contact email for podcast apps (required by Apple Podcasts)"
+    default: ""
+
   # ── API secrets (passed via --var in deploy.yml) ─────────────────────────────
   reddit_client_id:
     description: "Reddit OAuth client ID"

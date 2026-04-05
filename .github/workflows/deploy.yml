@@ -65,6 +65,8 @@ jobs:
           AUDIO_BASE_URL: ${{ secrets.AUDIO_BASE_URL }}
           CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          PODCAST_EMAIL: ${{ secrets.PODCAST_EMAIL }}
+          PODCAST_AUTHOR: ${{ secrets.PODCAST_AUTHOR }}
         run: |
           databricks bundle deploy --target $TARGET \
             --var "groq_api_key=${GROQ_API_KEY:-}" \
@@ -75,7 +77,9 @@ jobs:
             --var "gcs_bucket_name=${GCS_BUCKET_NAME:-}" \
             --var "audio_base_url=${AUDIO_BASE_URL:-}" \
             --var "claude_api_key=${CLAUDE_API_KEY:-}" \
-            --var "google_api_key=${GOOGLE_API_KEY:-}"
+            --var "google_api_key=${GOOGLE_API_KEY:-}" \
+            --var "podcast_email=${PODCAST_EMAIL:-}" \
+            --var "podcast_author=${PODCAST_AUTHOR:-Daily Databricks Team}"
           echo "Bundle deployed to target: $TARGET"
 
       # ── Trigger the Databricks job and wait for completion ─────────────────
