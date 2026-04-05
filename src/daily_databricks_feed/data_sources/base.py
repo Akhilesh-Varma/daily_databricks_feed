@@ -98,26 +98,69 @@ class BaseDataSource(ABC):
     SOURCE_NAME = "base"
     DEFAULT_RATE_LIMIT = 1.0  # requests per second
 
-    # Keywords to filter for Databricks-related content
+    # Keywords to filter for relevant content
     DATABRICKS_KEYWORDS = [
+        # Databricks platform
         "databricks",
         "delta lake",
         "delta-lake",
         "deltalake",
-        "spark",
         "apache spark",
         "lakehouse",
         "mlflow",
         "unity catalog",
-        "dbx",
-        "data engineering",
-        "data lakehouse",
-        "photon",
         "databricks sql",
         "delta sharing",
         "delta live tables",
-        "dlt",
+        "lakeflow",
+        "photon",
         "medallion architecture",
+        "dbx",
+        # Open table formats
+        "apache iceberg",
+        "iceberg",
+        "apache hudi",
+        "hudi",
+        "apache paimon",
+        "open table format",
+        # AI / LLM
+        "large language model",
+        "llm",
+        "generative ai",
+        "gen ai",
+        "claude",
+        "anthropic",
+        "gpt",
+        "openai",
+        "llama",
+        "mistral",
+        "hugging face",
+        "rag",
+        "retrieval augmented",
+        "vector search",
+        "embedding",
+        "fine-tuning",
+        "mosaic ai",
+        "ai gateway",
+        # Cloud data services
+        "azure synapse",
+        "azure data factory",
+        "microsoft fabric",
+        "fabric lakehouse",
+        "synapse analytics",
+        "aws glue",
+        "amazon redshift",
+        "bigquery",
+        "snowflake",
+        # Data engineering ecosystem
+        "dbt",
+        "apache kafka",
+        "apache flink",
+        "data engineering",
+        "data lakehouse",
+        "data mesh",
+        "data catalog",
+        "data governance",
     ]
 
     def __init__(
