@@ -46,19 +46,30 @@ daily_databricks_feed/
 
 ## Data Sources
 
-| Source | Auth required | Free quota | Content |
-|--------|--------------|------------|---------|
-| Hacker News | None | Unlimited | Tech news with Databricks mentions |
-| RSS Feeds | None | Unlimited | Official Databricks / Spark blogs |
-| GitHub Releases | None | 60 req/hr unauthenticated | SDK / runtime releases |
-| Databricks Community | None | Unlimited | Forum posts |
-| Dev.to | None | Unlimited | Community articles |
-| PyPI Releases | None | Unlimited | Python package updates |
-| Stack Overflow | None | Unlimited | Tagged questions |
-| Reddit | OAuth 2.0 | 100 req/min | r/databricks, r/dataengineering |
-| YouTube | API Key | 10,000 units/day | Tutorials & announcements |
+| Source | How it fetches | Auth | Filter strategy |
+|--------|---------------|------|-----------------|
+| **Hacker News** | Algolia Search API — searches by date | None | Keyword match on title + content |
+| **Reddit** | PRAW — polls `r/databricks` + `r/dataengineering` | OAuth 2.0 | Keyword filter on posts |
+| **YouTube** | YouTube Data API v3 — searches relevant videos | API Key | Keyword match on title + description |
+| **RSS Feeds** | feedparser — polls 5 official blogs (Databricks, Delta, MLflow, Spark, Medium) | None | Always relevant (curated feeds) |
+| **GitHub Releases** | GitHub REST API — watches databricks-sdk, MLflow, Delta repos | Token (optional) | Always relevant (curated repos) |
+| **PyPI** | PyPI JSON API — polls `databricks-*` package versions | None | Package name whitelist |
+| **Stack Overflow** | Stack Exchange API — questions tagged `databricks` | Key (optional) | Tag-based, already filtered |
+| **Dev.to** | Forem REST API — articles tagged `databricks` | None | Tag + keyword filter |
+| **Databricks Community** | Discourse REST API — latest + top posts from community.databricks.com | None | Already on-topic domain |
 
 Reddit and YouTube are optional — the pipeline runs with 7 sources if those credentials are missing.
+
+### Keyword filter
+
+All sources that pull from general feeds (Hacker News, Reddit, YouTube, Dev.to) run every item through a ~80-keyword filter before passing it downstream. Keywords cover:
+
+- **Databricks platform**: delta lake, unity catalog, mlflow, lakeflow, photon, medallion architecture, serverless DLT, declarative pipelines, asset bundles
+- **Latest releases**: lakebase, lakebridge, databricks apps, databricks connect, model serving, DBRX, AI functions, vector search
+- **Open table formats**: Apache Iceberg, Apache Hudi, Apache Paimon
+- **AI / LLM**: claude, anthropic, gpt, llama, mistral, rag, embeddings, fine-tuning, mosaic AI
+- **Cloud data services**: Azure Synapse, Microsoft Fabric, AWS Glue, BigQuery, Snowflake
+- **Data ecosystem**: dbt, Apache Kafka, Apache Flink, data mesh, data governance
 
 ## LLM Providers
 
