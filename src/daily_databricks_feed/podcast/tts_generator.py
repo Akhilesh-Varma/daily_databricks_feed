@@ -156,7 +156,8 @@ class TTSGenerator:
 
         # Check if token is still valid
         if self._access_token and self._token_expiry:
-            if datetime.now(timezone.utc) < self._token_expiry:
+            expiry = self._token_expiry.replace(tzinfo=timezone.utc) if self._token_expiry.tzinfo is None else self._token_expiry
+            if datetime.now(timezone.utc) < expiry:
                 return self._access_token
 
         try:
